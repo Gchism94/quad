@@ -300,30 +300,57 @@ func TestSetCollaboratorResolvesUserID(t *testing.T) {
 	}
 }
 
-func TestSetCollaboratorAlreadyMemberUpdates(t *testing.T) {
-	calls := 0
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		calls++
-		switch calls {
-		case 1: // resolve id
-			w.Write([]byte(`[{"id":42}]`))
-		case 2: // POST member → 409 already a member
-			w.WriteHeader(http.StatusConflict)
-		case 3: // PUT update level
-			if r.Method != http.MethodPut || r.URL.Path != "/api/v4/projects/cs101/hw1/members/42" {
-				t.Errorf("call 3: %s %s", r.Method, r.URL.Path)
-			}
-			w.WriteHeader(http.StatusOK)
-		default:
-			t.Errorf("unexpected call %d", calls)
-		}
-	}))
-	defer srv.Close()
-	if err := newTestAdapter(t, srv).SetCollaborator(bg, adapter.RepoRef{Namespace: "cs101", Name: "hw1"}, "bob", adapter.RoleWrite); err != nil {
-		t.Fatal(err)
+// TestSetCollaboratorMemberAddResponses covers how the member-add POST response is
+// interpreted: an already-satisfied membership (already a direct member, or an
+// equal-or-higher inherited level) is non-fatal, while genuine failures error.
+func TestSetCollaboratorMemberAddResponses(t *testing.T) {
+	cases := []struct {
+		name    string
+		status  int
+		body    string
+		wantErr bool
+	}{
+		{"created", http.StatusCreated, ``, false},
+		{"already a direct member (409)", http.StatusConflict, `{"message":"Member already exists"}`, false},
+		{
+			"inherited access (400)", http.StatusBadRequest,
+			`{"message":{"access_level":["should be greater than or equal to Owner inherited membership from group g"]}}`,
+			false,
+		},
+		{"unrelated 400 still errors", http.StatusBadRequest, `{"message":"bad request"}`, true},
+		{"forbidden errors", http.StatusForbidden, `{"message":"403 Forbidden"}`, true},
 	}
-	if calls != 3 {
-		t.Fatalf("calls = %d, want 3 (resolve, POST 409, PUT)", calls)
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			calls := 0
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				assertToken(t, r)
+				calls++
+				switch calls {
+				case 1: // resolve user id
+					w.Write([]byte(`[{"id":42}]`))
+				case 2: // add member → case-specific response
+					if r.Method != http.MethodPost || r.URL.Path != "/api/v4/projects/cs101/hw1/members" {
+						t.Errorf("call 2: %s %s", r.Method, r.URL.Path)
+					}
+					w.WriteHeader(tc.status)
+					if tc.body != "" {
+						w.Write([]byte(tc.body))
+					}
+				default:
+					t.Errorf("unexpected call %d (no PUT/update expected)", calls)
+				}
+			}))
+			defer srv.Close()
+
+			err := newTestAdapter(t, srv).SetCollaborator(bg, adapter.RepoRef{Namespace: "cs101", Name: "hw1"}, "bob", adapter.RoleWrite)
+			if tc.wantErr && err == nil {
+				t.Errorf("status %d: want error, got nil", tc.status)
+			}
+			if !tc.wantErr && err != nil {
+				t.Errorf("status %d: want nil, got %v", tc.status, err)
+			}
+		})
 	}
 }
 

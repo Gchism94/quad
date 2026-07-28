@@ -139,7 +139,9 @@ quad control plane listening on :8080
    in a private window, authenticate as a student. Quad provisions
    `cs101/hw-1-<student>` (a fork with the relationship broken), adds the student as
    a project member, and lands them on **`/me`** with their repo link, deadline, and
-   grading status.
+   grading status. If the roster user is already an Owner/Maintainer of the target
+   group (e.g. the instructor testing with their own account, or a TA), Quad skips
+   the redundant member add — they already have access.
 4. **Grading + push regrade** — trigger grading; clones use `oauth2:<token>`. With a
    webhook configured (step 7), a `git push` re-runs grading and `/me` updates live.
 

@@ -146,3 +146,48 @@ func TestCloneRequestDefaultUsername(t *testing.T) {
 		t.Errorf("url = %q, want default username x-access-token", url)
 	}
 }
+
+func TestCloneRequestForgejoOverHTTP(t *testing.T) {
+	// A Forgejo/Gitea instance served over plain HTTP (e.g. http://localhost:3000)
+	// must be cloned over http, not forced through TLS.
+	g := makeCheckout(adapter.HostForgejo, CloneCreds{
+		Scheme:   "http",
+		Hostname: "localhost:3000",
+		Username: "username",
+		Token:    "t",
+	})
+	repo := adapter.RepoRef{Host: adapter.HostForgejo, Namespace: "ns", Name: "name"}
+	url, tok, err := g.cloneRequest(repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if tok != "t" {
+		t.Errorf("token = %q, want t", tok)
+	}
+	want := "http://username@localhost:3000/ns/name.git"
+	if url != want {
+		t.Errorf("url = %q, want %q", url, want)
+	}
+	// Token must never appear in the URL.
+	if strings.Contains(url, "t@localhost") && !strings.HasPrefix(url, "http://username@") {
+		t.Errorf("token may have leaked into URL: %q", url)
+	}
+}
+
+func TestCloneRequestSchemeDefaultsToHTTPS(t *testing.T) {
+	// An empty Scheme defaults to https (backward-compatible with existing config).
+	g := makeCheckout(adapter.HostGitHub, CloneCreds{
+		Hostname: "github.com",
+		Username: "x-access-token",
+		Token:    "t",
+		// Scheme intentionally unset
+	})
+	url, _, err := g.cloneRequest(ghRepo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "https://x-access-token@github.com/cs101-org/hw1-alice.git"
+	if url != want {
+		t.Errorf("url = %q, want %q", url, want)
+	}
+}

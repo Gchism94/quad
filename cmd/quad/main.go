@@ -256,36 +256,40 @@ func splitCSV(s string) []string {
 // Container options: QUAD_GRADER_RUNTIME (docker|podman), QUAD_GRADER_IMAGE
 // (default image), QUAD_GRADER_NETWORK (none|restricted),
 // QUAD_GRADER_RESTRICTED_NETWORK (runtime network name), QUAD_GRADER_USER.
-// hostFromURL extracts the host (e.g. "forgejo.example.org") from a base URL.
-// Returns "" when raw is empty or unparseable.
-func hostFromURL(raw string) string {
+// schemeHostFromURL extracts the scheme (e.g. "http") and host (e.g.
+// "localhost:3000") from a base URL. Returns ("", "") when raw is empty or
+// unparseable. The clone path uses both so a plain-http instance is not forced
+// through TLS.
+func schemeHostFromURL(raw string) (scheme, host string) {
 	u, err := url.Parse(raw)
-	if err != nil {
-		return ""
+	if err != nil || u.Host == "" {
+		return "", ""
 	}
-	return u.Host
+	return u.Scheme, u.Host
 }
 
 func graderFromEnv(st store.Store) provisioning.Grader {
-	// Build a per-host credential map so the checkout knows which hostname and
-	// token to use for each adapter.Host. The token is never embedded in the
+	// Build a per-host credential map so the checkout knows which scheme, hostname,
+	// and token to use for each adapter.Host. The token is never embedded in the
 	// clone URL — it is delivered via GIT_ASKPASS (H1 credential hygiene).
-	ghHost := "github.com"
+	ghScheme, ghHost := "https", "github.com"
 	if b := os.Getenv("QUAD_GITHUB_BASE_URL"); b != "" {
-		if h := hostFromURL(b); h != "" {
-			ghHost = h // GHES: use the enterprise instance hostname
+		if s, h := schemeHostFromURL(b); h != "" {
+			ghScheme, ghHost = s, h // GHES: use the enterprise scheme + hostname
 		}
 	}
 	hosts := map[adapter.Host]grading.CloneCreds{
 		adapter.HostGitHub: {
+			Scheme:   ghScheme,
 			Hostname: ghHost,
 			Username: "x-access-token",
 			Token:    os.Getenv("QUAD_GIT_CLONE_TOKEN"),
 		},
 	}
 	if base := os.Getenv("QUAD_FORGEJO_BASE_URL"); base != "" {
-		if h := hostFromURL(base); h != "" {
+		if s, h := schemeHostFromURL(base); h != "" {
 			creds := grading.CloneCreds{
+				Scheme:   s,
 				Hostname: h,
 				Username: getenvDefault("QUAD_FORGEJO_GIT_USERNAME", "oauth2"),
 				Token:    os.Getenv("QUAD_FORGEJO_TOKEN"),
@@ -298,15 +302,14 @@ func graderFromEnv(st store.Store) provisioning.Grader {
 	}
 	if tok := os.Getenv("QUAD_GITLAB_TOKEN"); tok != "" {
 		// GitLab HTTPS clone uses oauth2:<token> — oauth2 as the username (the
-		// opposite of Forgejo). Base URL defaults to gitlab.com.
-		glHost := "gitlab.com"
-		if h := hostFromURL(os.Getenv("QUAD_GITLAB_BASE_URL")); h != "" {
-			glHost = h
-		}
-		hosts[adapter.HostGitLab] = grading.CloneCreds{
-			Hostname: glHost,
-			Username: getenvDefault("QUAD_GITLAB_GIT_USERNAME", "oauth2"),
-			Token:    tok,
+		// opposite of Forgejo). Base URL defaults to https://gitlab.com.
+		if s, h := schemeHostFromURL(getenvDefault("QUAD_GITLAB_BASE_URL", "https://gitlab.com")); h != "" {
+			hosts[adapter.HostGitLab] = grading.CloneCreds{
+				Scheme:   s,
+				Hostname: h,
+				Username: getenvDefault("QUAD_GITLAB_GIT_USERNAME", "oauth2"),
+				Token:    tok,
+			}
 		}
 	}
 	checkout := grading.NewGitCheckout(hosts)

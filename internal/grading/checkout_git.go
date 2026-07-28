@@ -17,7 +17,8 @@ import (
 // (public repos only). When set, it is delivered to git exclusively via
 // GIT_ASKPASS — never in the URL or process arguments.
 type CloneCreds struct {
-	Hostname string // clone endpoint, e.g. "github.com" or "forgejo.example.org"
+	Scheme   string // "https" (default) or "http"; follows the host's base URL
+	Hostname string // clone endpoint, e.g. "github.com" or "localhost:3000"
 	Username string // URL username (non-secret), e.g. "x-access-token" or "oauth2"
 	Token    string // optional; delivered via askpass, never in argv or .git/config
 }
@@ -51,22 +52,28 @@ func (g *GitCheckout) bin() string {
 
 // cloneRequest computes the clone URL and the token for repo. The token is
 // NEVER embedded in the URL; only the non-secret username is included when
-// authentication is required. This function is pure (no exec), making it
-// independently testable.
+// authentication is required. The scheme follows the host's configured base URL
+// (CloneCreds.Scheme), defaulting to https — so a plain-http instance (e.g.
+// http://localhost:3000) is cloned over http rather than forced through TLS.
+// This function is pure (no exec), making it independently testable.
 func (g *GitCheckout) cloneRequest(repo adapter.RepoRef) (cloneURL, token string, err error) {
 	cc, ok := g.Hosts[repo.Host]
 	if !ok || cc.Hostname == "" {
 		return "", "", fmt.Errorf("checkout: no clone configuration for host %q", repo.Host)
+	}
+	scheme := cc.Scheme
+	if scheme == "" {
+		scheme = "https"
 	}
 	if cc.Token != "" {
 		user := cc.Username
 		if user == "" {
 			user = "x-access-token"
 		}
-		return fmt.Sprintf("https://%s@%s/%s/%s.git", user, cc.Hostname, repo.Namespace, repo.Name),
+		return fmt.Sprintf("%s://%s@%s/%s/%s.git", scheme, user, cc.Hostname, repo.Namespace, repo.Name),
 			cc.Token, nil
 	}
-	return fmt.Sprintf("https://%s/%s/%s.git", cc.Hostname, repo.Namespace, repo.Name), "", nil
+	return fmt.Sprintf("%s://%s/%s/%s.git", scheme, cc.Hostname, repo.Namespace, repo.Name), "", nil
 }
 
 // Fetch shallow-clones repo into dir (which must be an existing empty directory).

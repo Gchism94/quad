@@ -1,14 +1,16 @@
 # Quad
 
-> Working name — placeholder, swap freely.
+> Settled name: **Cairn** (see `../educloud/SYSTEM.md`). The repo and code
+> keep the working name until the publish-step rename, applied in one commit.
 
 **An open-source, host-agnostic, privacy-minimal platform for distributing and
 auto-grading coding assignments backed by Git.** The GitHub Classroom workflow,
 rebuilt so that educators own their data and aren't locked to a single vendor.
 
-> ⚠️ **Status: alpha.** Core provisioning, student self-enrollment, grading, and
-> the Forgejo adapter are working end-to-end. The instructor dashboard and some
-> advanced adapter methods are still in progress. See [`ROADMAP.md`](ROADMAP.md).
+> **Status: pilot sprint (July 2026).** Phase 1 is complete and the GitHub,
+> Forgejo, and GitLab adapters work end to end. Remaining before the Fall
+> pilot: Classroom import, `doctor`, the one-command deploy path, and student
+> views. See [`ROADMAP.md`](ROADMAP.md) and [`KICKOFF-PROMPT.md`](KICKOFF-PROMPT.md).
 
 ## Why
 
@@ -293,10 +295,13 @@ QUAD_FORGEJO_TOKEN=...  go run ./cmd/quad   # Forgejo token reused for grading
 ```
 
 The checkout is **host-aware**: clones are directed to the right instance
-(`github.com`, a GHES host, or the Forgejo/Gitea base URL) and authenticate via
-`GIT_ASKPASS` — the token is passed to git through the process environment only,
-never embedded in the clone URL or process arguments. Two optional env vars affect
-clone behaviour:
+(`github.com`, a GHES host, or the Forgejo/Gitea/GitLab base URL) and authenticate
+via `GIT_ASKPASS` — the token is passed to git through the process environment
+only, never embedded in the clone URL or process arguments. The clone **scheme
+follows each host's base URL** (`QUAD_FORGEJO_BASE_URL` / `QUAD_GITLAB_BASE_URL` /
+`QUAD_GITHUB_BASE_URL`) and defaults to `https`, so a plain-HTTP instance (e.g.
+`http://localhost:3000`) is cloned over `http` rather than forced through TLS. Two
+optional env vars affect clone behaviour:
 
 | Variable | Default | Purpose |
 |---|---|---|

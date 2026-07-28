@@ -21,9 +21,20 @@ their final shape:
 - [x] Operator authentication — host OAuth + username allowlist, cookie sessions, `created_by` attribution; opt-in via `QUAD_ADMIN_USERS` (open mode otherwise, with a warning)
 
 ## Phase 2 — Host-agnostic *(the differentiator)*
-- [ ] Forgejo/Gitea adapter
-- [ ] GitLab adapter
-- [ ] Generalized auth across hosts
+- [x] Forgejo/Gitea adapter — working end to end (README; live-validated)
+- [x] GitLab adapter — adapter + OAuth resolver + webhook wiring (commit 5388baf)
+- [ ] Generalized auth across hosts — remaining polish
+
+*(Checkboxes updated 2026-07-21 to match commits and README; the file had drifted.)*
+
+## Pilot sprint — July–August 2026 (the 1.0-beta gap; see KICKOFF-PROMPT.md)
+Deadline context: pilot-ready before the August 28 shutdown; the pilot course
+integrates for the full semester from the first assignment.
+- [ ] GitHub Classroom import (`quad import ghc`) — the migration path
+- [ ] `quad doctor` self-diagnostics
+- [ ] One-command deploy verified on a clean VM (docs/deploy.md)
+- [ ] Student-facing views completed
+- [ ] docs/migrate-from-github-classroom.md — the afternoon migration guide
 
 ## Phase 3 — Ephemeral LMS roster agent
 - [ ] Open, auditable local agent (browser extension / CLI)

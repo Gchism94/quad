@@ -269,24 +269,44 @@ func (a *Adapter) resolveUserID(ctx context.Context, username string) (int64, er
 	return users[0].ID, nil
 }
 
-// SetCollaborator grants username the given role on repo. Idempotent: if the user
-// is already a member, the member's access level is updated instead.
+// memberAlreadySatisfied reports whether a failed member-add response means the
+// user already has equal-or-higher access, so the add is a harmless no-op:
+//   - 409: the user is already a direct member (idempotent).
+//   - 400: GitLab rejects adding a member below an access level they already hold
+//     via inherited group membership (e.g. an Owner/Maintainer of the group).
+func memberAlreadySatisfied(status int, body []byte) bool {
+	if status == http.StatusConflict {
+		return true
+	}
+	if status == http.StatusBadRequest {
+		b := strings.ToLower(string(body))
+		return strings.Contains(b, "inherited membership") ||
+			strings.Contains(b, "greater than or equal to")
+	}
+	return false
+}
+
+// SetCollaborator grants username the given role on repo. A roster user with no
+// prior access is added at the requested level. The call is idempotent and
+// tolerant of users who already have access: if they are already a direct member
+// (409) or already hold an equal-or-higher level via inherited group membership
+// (400), the redundant add is treated as success rather than failing provisioning.
 func (a *Adapter) SetCollaborator(ctx context.Context, repo adapter.RepoRef, username string, role adapter.Role) error {
 	uid, err := a.resolveUserID(ctx, username)
 	if err != nil {
 		return err
 	}
-	level := accessLevel(role)
-	in := map[string]any{"user_id": uid, "access_level": level}
+	in := map[string]any{"user_id": uid, "access_level": accessLevel(role)}
 	pid := projectID(repo)
-	err = a.do(ctx, http.MethodPost, "/projects/"+pid+"/members", in, nil, http.StatusCreated)
+	err = a.do(ctx, http.MethodPost, "/projects/"+pid+"/members", in, nil, http.StatusOK, http.StatusCreated)
 	if err == nil {
 		return nil
 	}
-	// Already a member → update the existing membership.
-	if statusOf(err) == http.StatusConflict {
-		return a.do(ctx, http.MethodPut, "/projects/"+pid+"/members/"+strconv.FormatInt(uid, 10),
-			map[string]any{"access_level": level}, nil, http.StatusOK)
+	// Inspect the response: an already-satisfied membership is non-fatal because
+	// the user already has the access we were trying to grant.
+	var ae *apiError
+	if errors.As(err, &ae) && memberAlreadySatisfied(ae.Status, []byte(ae.Body)) {
+		return nil
 	}
 	return err
 }

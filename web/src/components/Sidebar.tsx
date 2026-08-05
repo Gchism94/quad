@@ -19,7 +19,7 @@ export function Sidebar({
   return (
     <aside className="sidebar">
       <div className="brand">
-        <span className="brand-mark">quad</span>
+        <span className="brand-mark">cairn</span>
         <span className="brand-sub">instructor console</span>
       </div>
 

@@ -30,7 +30,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/quad/quad/pkg/adapter"
+	"github.com/EduCloud-Ecosystem/cairn/pkg/adapter"
 )
 
 // Config holds credentials for a GitLab instance.
@@ -423,14 +423,14 @@ func (a *Adapter) EnsureWebhook(ctx context.Context, repo adapter.RepoRef, spec 
 	return a.do(ctx, http.MethodPost, "/projects/"+pid+"/hooks", in, nil, http.StatusCreated)
 }
 
-// DispatchGrading returns ErrNotImplemented: Quad grades on its own sandboxed
+// DispatchGrading returns ErrNotImplemented: Cairn grades on its own sandboxed
 // runners rather than dispatching GitLab CI.
 func (a *Adapter) DispatchGrading(_ context.Context, _ adapter.GradingDispatch) error {
 	return adapter.ErrNotImplemented
 }
 
 // GradingResult reads the commit's CI statuses and maps the latest to a
-// CheckResult. Numeric scores come from Quad's runner path, not here.
+// CheckResult. Numeric scores come from Cairn's runner path, not here.
 func (a *Adapter) GradingResult(ctx context.Context, repo adapter.RepoRef, sha string) (adapter.CheckResult, error) {
 	path := "/projects/" + projectID(repo) + "/repository/commits/" + url.PathEscape(sha) + "/statuses"
 	var statuses []struct {

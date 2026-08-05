@@ -14,8 +14,8 @@ type Config struct {
 // Load reads configuration from environment variables, applying defaults.
 func Load() Config {
 	c := Config{
-		ListenAddr:  os.Getenv("QUAD_LISTEN_ADDR"),
-		DatabaseURL: os.Getenv("QUAD_DATABASE_URL"),
+		ListenAddr:  os.Getenv("CAIRN_LISTEN_ADDR"),
+		DatabaseURL: os.Getenv("CAIRN_DATABASE_URL"),
 	}
 	if c.ListenAddr == "" {
 		c.ListenAddr = ":8080"

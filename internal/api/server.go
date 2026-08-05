@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-// Package api is the Quad control-plane HTTP server.
+// Package api is the Cairn control-plane HTTP server.
 package api
 
 import (
@@ -19,11 +19,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/quad/quad/internal/id"
-	"github.com/quad/quad/internal/identity"
-	"github.com/quad/quad/internal/provisioning"
-	"github.com/quad/quad/internal/store"
-	"github.com/quad/quad/pkg/adapter"
+	"github.com/EduCloud-Ecosystem/cairn/internal/id"
+	"github.com/EduCloud-Ecosystem/cairn/internal/identity"
+	"github.com/EduCloud-Ecosystem/cairn/internal/provisioning"
+	"github.com/EduCloud-Ecosystem/cairn/internal/store"
+	"github.com/EduCloud-Ecosystem/cairn/pkg/adapter"
 )
 
 // Options holds the Server's dependencies.
@@ -55,7 +55,7 @@ type Options struct {
 	GraderConfigured bool
 	// Adapters is the set of configured host adapters. handleCreateClassroom
 	// validates a classroom's host against these so a classroom can only be
-	// created for a host Quad can actually provision against — deriving the
+	// created for a host Cairn can actually provision against — deriving the
 	// allowlist from runtime registration keeps it correct as hosts are added
 	// (e.g. both "forgejo" and "gitea" once the Gitea-family adapter is wired).
 	// The student API also uses them for RepoWebURL links.
@@ -290,7 +290,7 @@ func (s *Server) currentIdentity(r *http.Request) (host adapter.Host, username s
 	return sess.host, sess.username, true
 }
 
-const sessionCookie = "quad_session"
+const sessionCookie = "cairn_session"
 
 func newSessionToken() string {
 	b := make([]byte, 32)
@@ -400,17 +400,17 @@ func (s *Server) handleStatusPage(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(http.StatusOK)
 	fmt.Fprint(w, `<!doctype html>
-<html lang="en"><head><meta charset="utf-8"><title>Quad</title>
+<html lang="en"><head><meta charset="utf-8"><title>Cairn</title>
 <style>body{font-family:sans-serif;max-width:600px;margin:3rem auto;padding:0 1rem}
 code{background:#f4f4f4;padding:.1em .3em;border-radius:3px}</style></head>
 <body>
-<h1>Quad is running.</h1>
+<h1>Cairn is running.</h1>
 <p id="auth">Checking session…</p>
 <ul>
   <li><a href="/auth/login">Operator login</a></li>
   <li><a href="/healthz">Health check</a></li>
 </ul>
-<p><em>Dashboard not mounted — set <code>QUAD_WEB_DIR=web/dist</code> and restart.</em></p>
+<p><em>Dashboard not mounted — set <code>CAIRN_WEB_DIR=web/dist</code> and restart.</em></p>
 <script>
 fetch('/auth/me').then(r=>r.json()).then(d=>{
   var el=document.getElementById('auth');
@@ -524,7 +524,7 @@ func (s *Server) handleCreateClassroom(w http.ResponseWriter, r *http.Request) {
 	}
 	// Reject unknown hosts at create time so errors surface immediately rather
 	// than three layers deep on first provisioning attempt. The allowlist is the
-	// set of hosts with a registered adapter (what determines whether Quad can
+	// set of hosts with a registered adapter (what determines whether Cairn can
 	// provision), so it stays correct automatically as hosts are added.
 	if len(s.provisionHosts) > 0 {
 		if !s.provisionHosts[adapter.Host(in.Host)] {
@@ -694,7 +694,7 @@ func (s *Server) handleUnlock(w http.ResponseWriter, r *http.Request) {
 }
 func (s *Server) handleGrade(w http.ResponseWriter, r *http.Request) {
 	if !s.graderConfigured {
-		httpError(w, http.StatusConflict, "no grader configured — set QUAD_GRADER=container (or local-exec-unsafe) and restart")
+		httpError(w, http.StatusConflict, "no grader configured — set CAIRN_GRADER=container (or local-exec-unsafe) and restart")
 		return
 	}
 	s.enqueueAcrossSubmissions(w, r, provisioning.JobGrade, "grade", "grading")

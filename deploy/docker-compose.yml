@@ -1,25 +1,25 @@
-# PostgreSQL for local Quad development.
+# PostgreSQL for local Cairn development.
 #
 #   docker compose -f deploy/docker-compose.yml up -d
 #
 # Then point the server at it:
-#   export QUAD_DATABASE_URL=postgres://quad:quad@localhost:5432/quad?sslmode=disable
-#   QUAD_DB_AUTOMIGRATE=1 go run -tags postgres ./cmd/quad
+#   export CAIRN_DATABASE_URL=postgres://cairn:cairn@localhost:5432/cairn?sslmode=disable
+#   CAIRN_DB_AUTOMIGRATE=1 go run -tags postgres ./cmd/cairn
 services:
   postgres:
     image: postgres:16
     environment:
-      POSTGRES_USER: quad
-      POSTGRES_PASSWORD: quad
-      POSTGRES_DB: quad
+      POSTGRES_USER: cairn
+      POSTGRES_PASSWORD: cairn
+      POSTGRES_DB: cairn
     ports:
       - "5433:5432"
     volumes:
-      - quad_pgdata:/var/lib/postgresql/data
+      - cairn_pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U quad"]
+      test: ["CMD-SHELL", "pg_isready -U cairn"]
       interval: 5s
       timeout: 3s
       retries: 10
 volumes:
-  quad_pgdata:
+  cairn_pgdata:

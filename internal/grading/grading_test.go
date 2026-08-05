@@ -9,10 +9,10 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/quad/quad/internal/store"
-	"github.com/quad/quad/internal/store/memory"
-	"github.com/quad/quad/pkg/adapter"
-	"github.com/quad/quad/pkg/gradingspec"
+	"github.com/EduCloud-Ecosystem/cairn/internal/store"
+	"github.com/EduCloud-Ecosystem/cairn/internal/store/memory"
+	"github.com/EduCloud-Ecosystem/cairn/pkg/adapter"
+	"github.com/EduCloud-Ecosystem/cairn/pkg/gradingspec"
 )
 
 func TestExecRunnerScoresByMatchAndExit(t *testing.T) {

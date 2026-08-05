@@ -12,7 +12,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/quad/quad/pkg/adapter"
+	"github.com/EduCloud-Ecosystem/cairn/pkg/adapter"
 )
 
 func testKeyPEM(t *testing.T) []byte {

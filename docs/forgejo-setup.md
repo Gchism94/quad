@@ -1,6 +1,6 @@
 # Forgejo / Gitea setup walkthrough
 
-This guide walks through wiring Quad to a self-hosted Forgejo (or Gitea)
+This guide walks through wiring Cairn to a self-hosted Forgejo (or Gitea)
 instance, validated against a live Forgejo deployment. Gitea follows the same
 steps — the `/api/v1` surface is identical.
 
@@ -10,8 +10,8 @@ steps — the `/api/v1` surface is identical.
 
 - A running Forgejo instance (≥ 1.20 recommended)
 - An admin account on that instance
-- Go 1.25+ installed on the machine running Quad
-- Outbound HTTPS access from Quad to the Forgejo instance
+- Go 1.25+ installed on the machine running Cairn
+- Outbound HTTPS access from Cairn to the Forgejo instance
 
 ---
 
@@ -29,8 +29,8 @@ Required scopes (grant only these):
 Copy the token — you will not see it again.
 
 ```sh
-export QUAD_FORGEJO_BASE_URL=https://forgejo.example.org
-export QUAD_FORGEJO_TOKEN=fj_exampleTokenFromStep1
+export CAIRN_FORGEJO_BASE_URL=https://forgejo.example.org
+export CAIRN_FORGEJO_TOKEN=fj_exampleTokenFromStep1
 ```
 
 ---
@@ -42,7 +42,7 @@ export QUAD_FORGEJO_TOKEN=fj_exampleTokenFromStep1
 3. Go to **Settings → Repository** and tick **✓ Template Repository**.
 
 The generate endpoint returns an error if the source is not marked as a template.
-Quad's adapter surfaces that error verbatim rather than silently failing.
+Cairn's adapter surfaces that error verbatim rather than silently failing.
 
 ---
 
@@ -52,15 +52,15 @@ In Forgejo: **Settings → Applications → Manage OAuth2 Applications → Add O
 
 | Field | Value |
 |---|---|
-| Application name | `Quad` |
-| Redirect URI | `https://your-quad-host/auth/callback` |
+| Application name | `Cairn` |
+| Redirect URI | `https://your-cairn-host/auth/callback` |
 
 Copy the **Client ID** and **Client Secret**.
 
 ```sh
-export QUAD_FORGEJO_OAUTH_CLIENT_ID=2a1b3c4d-5e6f-7a8b-9c0d-1e2f3a4b5c6d
-export QUAD_FORGEJO_OAUTH_CLIENT_SECRET=gto_exampleOAuthSecretFromStep3
-export QUAD_OAUTH_REDIRECT_URL=https://your-quad-host/auth/callback
+export CAIRN_FORGEJO_OAUTH_CLIENT_ID=2a1b3c4d-5e6f-7a8b-9c0d-1e2f3a4b5c6d
+export CAIRN_FORGEJO_OAUTH_CLIENT_SECRET=gto_exampleOAuthSecretFromStep3
+export CAIRN_OAUTH_REDIRECT_URL=https://your-cairn-host/auth/callback
 ```
 
 The same redirect URI serves all hosts — the state parameter carries the host so
@@ -69,28 +69,28 @@ GitHub or Forgejo.
 
 ---
 
-## 4. Start Quad
+## 4. Start Cairn
 
 ```sh
 # Minimal: token + base URL only (no student OAuth, no dashboard)
-go run ./cmd/quad
+go run ./cmd/cairn
 
 # With student OAuth and admin allowlist:
-export QUAD_ADMIN_USERS=alice,bob
-export QUAD_OPERATOR_HOST=forgejo      # log operators in via Forgejo accounts
-export QUAD_COOKIE_SECURE=1            # set behind HTTPS
-QUAD_WEB_DIR=web/dist go run ./cmd/quad
+export CAIRN_ADMIN_USERS=alice,bob
+export CAIRN_OPERATOR_HOST=forgejo      # log operators in via Forgejo accounts
+export CAIRN_COOKIE_SECURE=1            # set behind HTTPS
+CAIRN_WEB_DIR=web/dist go run ./cmd/cairn
 ```
 
 On startup you should see (abridged):
 
 ```
-store: sqlite /absolute/path/to/quad.db
+store: sqlite /absolute/path/to/cairn.db
 adapters registered: forgejo
 identity resolvers: forgejo  operator-host: forgejo
-grading: DISABLED — grade requests will be rejected (set QUAD_GRADER=container)
-dashboard: not mounted — set QUAD_WEB_DIR=web/dist (status page at /)
-quad control plane listening on :8080
+grading: DISABLED — grade requests will be rejected (set CAIRN_GRADER=container)
+dashboard: not mounted — set CAIRN_WEB_DIR=web/dist (status page at /)
+cairn control plane listening on :8080
 ```
 
 Verify with:
@@ -154,10 +154,10 @@ curl -s -X POST http://localhost:8080/classrooms/<classroom-id>/assignments \
 Direct students to:
 
 ```
-https://your-quad-host/assignments/<assignment-id>/accept
+https://your-cairn-host/assignments/<assignment-id>/accept
 ```
 
-Quad redirects them to Forgejo's OAuth consent page. After approval, it:
+Cairn redirects them to Forgejo's OAuth consent page. After approval, it:
 
 1. Retrieves the student's Forgejo username and numeric user id (no real name,
    email, or SIS id).
@@ -166,7 +166,7 @@ Quad redirects them to Forgejo's OAuth consent page. After approval, it:
 4. Starts a student session and **redirects the student to `/me`**, where they see
    their repo link, deadline, grading status, score, and per-test results.
 
-If `join_policy` is `"roster"` and the student's username is not pre-listed, Quad
+If `join_policy` is `"roster"` and the student's username is not pre-listed, Cairn
 returns `403 {"error":"not on roster","username":"<student>"}` and enqueues nothing.
 
 ---
@@ -174,14 +174,14 @@ returns `403 {"error":"not on roster","username":"<student>"}` and enqueues noth
 ## 8. Configure grading (optional)
 
 ```sh
-export QUAD_GRADER=container
-export QUAD_GRADER_IMAGE=python:3.12       # default image; specs may override
-export QUAD_GRADER_RUNTIME=docker          # or podman
-export QUAD_FORGEJO_TOKEN=fj_exampleTokenFromStep1   # reused for private repo clones
+export CAIRN_GRADER=container
+export CAIRN_GRADER_IMAGE=python:3.12       # default image; specs may override
+export CAIRN_GRADER_RUNTIME=docker          # or podman
+export CAIRN_FORGEJO_TOKEN=fj_exampleTokenFromStep1   # reused for private repo clones
 
 # Clone auth: Forgejo token is delivered via GIT_ASKPASS — never in the URL.
 # If your instance requires the token owner's username instead of "oauth2":
-export QUAD_FORGEJO_GIT_USERNAME=alice
+export CAIRN_FORGEJO_GIT_USERNAME=alice
 ```
 
 Trigger grading for all provisioned submissions in a classroom:
@@ -197,18 +197,18 @@ curl -s -X POST http://localhost:8080/classrooms/<classroom-id>/assignments/<ass
 ## 9. Webhooks (auto-regrade on push)
 
 With a webhook configured, a student's `git push` re-runs grading automatically and
-their `/me` page updates live. Quad registers the webhook on each repo when
-`QUAD_WEBHOOK_BASE_URL` is set, appending `/webhooks/forgejo` per repo and signing
+their `/me` page updates live. Cairn registers the webhook on each repo when
+`CAIRN_WEBHOOK_BASE_URL` is set, appending `/webhooks/forgejo` per repo and signing
 deliveries with the secret below.
 
 ```sh
-# Public BASE URL of Quad. Quad appends /webhooks/forgejo per repo. It must be
+# Public BASE URL of Cairn. Cairn appends /webhooks/forgejo per repo. It must be
 # reachable BY THE FORGEJO SERVER. The secret must match on both sides.
-export QUAD_WEBHOOK_BASE_URL=https://your-quad-host
-export QUAD_FORGEJO_WEBHOOK_SECRET=$(openssl rand -hex 32)   # also covers host: gitea
+export CAIRN_WEBHOOK_BASE_URL=https://your-cairn-host
+export CAIRN_FORGEJO_WEBHOOK_SECRET=$(openssl rand -hex 32)   # also covers host: gitea
 ```
 
-Restart Quad and confirm the startup summary shows the webhook base URL and
+Restart Cairn and confirm the startup summary shows the webhook base URL and
 `webhook secret [forgejo]: set` (and `[gitea]: set`). New provisions register the
 webhook automatically; re-provision existing repos, or add the webhook by hand in
 the repo's **Settings → Webhooks** pointing at `<base>/webhooks/forgejo` with the
@@ -227,10 +227,10 @@ same secret.
 
 | Quirk | Details |
 |---|---|
-| **422 on generate** | Forgejo/Gitea returns 422 for two distinct cases: genuine validation errors *and* "repo already exists". Quad disambiguates with a re-GET before treating 422 as failure. |
+| **422 on generate** | Forgejo/Gitea returns 422 for two distinct cases: genuine validation errors *and* "repo already exists". Cairn disambiguates with a re-GET before treating 422 as failure. |
 | **Template flag required** | The source repo must have the Template flag set. The adapter surfaces the raw 422 body (`{"message":"..."}`) so the error is actionable. |
 | **`IncludeAllBranches`** | Gitea's generate endpoint copies only the default branch. `CreateRepoOptions.IncludeAllBranches` is accepted but silently ignored — a known upstream limitation. |
 | **Org already exists** | `EnsureNamespace` treats a 422 with an "already exists" body as success (idempotent). |
-| **HTTPS clone username** | `oauth2` is the widely-supported convention for Forgejo HTTPS token auth. If clones fail, try `QUAD_FORGEJO_GIT_USERNAME=<token-owner>`. |
-| **Webhook delivery `401`** | The signature didn't verify: the secret in Forgejo's webhook config doesn't match `QUAD_FORGEJO_WEBHOOK_SECRET`. Re-set both to the same value. |
+| **HTTPS clone username** | `oauth2` is the widely-supported convention for Forgejo HTTPS token auth. If clones fail, try `CAIRN_FORGEJO_GIT_USERNAME=<token-owner>`. |
+| **Webhook delivery `401`** | The signature didn't verify: the secret in Forgejo's webhook config doesn't match `CAIRN_FORGEJO_WEBHOOK_SECRET`. Re-set both to the same value. |
 | **Webhook `204`, no grading** | The push wasn't matched to a submission — wrong repo namespace/name (the repo isn't a provisioned submission), or the delivery was a non-push event (e.g. a ping). Pushes to tracked student repos return `202`. |

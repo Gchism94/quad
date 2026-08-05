@@ -14,11 +14,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/quad/quad/internal/identity"
-	"github.com/quad/quad/internal/provisioning"
-	"github.com/quad/quad/internal/store"
-	"github.com/quad/quad/internal/store/memory"
-	"github.com/quad/quad/pkg/adapter"
+	"github.com/EduCloud-Ecosystem/cairn/internal/identity"
+	"github.com/EduCloud-Ecosystem/cairn/internal/provisioning"
+	"github.com/EduCloud-Ecosystem/cairn/internal/store"
+	"github.com/EduCloud-Ecosystem/cairn/internal/store/memory"
+	"github.com/EduCloud-Ecosystem/cairn/pkg/adapter"
 )
 
 // fakeResolver returns a fixed username and hostUserID without any network call.
@@ -735,8 +735,8 @@ func TestStatusPageNoWebDir(t *testing.T) {
 	if !strings.HasPrefix(ct, "text/html") {
 		t.Errorf("Content-Type = %q, want text/html", ct)
 	}
-	if !strings.Contains(rec.Body.String(), "Quad is running") {
-		t.Error("status page body should contain 'Quad is running'")
+	if !strings.Contains(rec.Body.String(), "Cairn is running") {
+		t.Error("status page body should contain 'Cairn is running'")
 	}
 
 	// GET /nonexistent → 404 (status page should NOT catch all paths)

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-// Package migrations holds Quad's SQL schema migrations and embeds them so the
+// Package migrations holds Cairn's SQL schema migrations and embeds them so the
 // Postgres store can apply them without shipping loose files.
 package migrations
 

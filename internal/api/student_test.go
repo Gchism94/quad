@@ -11,10 +11,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/quad/quad/internal/grading"
-	"github.com/quad/quad/internal/store"
-	"github.com/quad/quad/internal/store/memory"
-	"github.com/quad/quad/pkg/adapter"
+	"github.com/EduCloud-Ecosystem/cairn/internal/grading"
+	"github.com/EduCloud-Ecosystem/cairn/internal/store"
+	"github.com/EduCloud-Ecosystem/cairn/internal/store/memory"
+	"github.com/EduCloud-Ecosystem/cairn/pkg/adapter"
 )
 
 // studentCookie mints a student session directly (bypassing OAuth) and returns

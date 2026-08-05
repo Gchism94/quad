@@ -6,8 +6,8 @@ import (
 	"context"
 	"time"
 
-	"github.com/quad/quad/internal/id"
-	"github.com/quad/quad/internal/store"
+	"github.com/EduCloud-Ecosystem/cairn/internal/id"
+	"github.com/EduCloud-Ecosystem/cairn/internal/store"
 )
 
 // Service is the store-backed producer side of the queue.

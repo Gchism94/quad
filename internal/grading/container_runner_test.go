@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/quad/quad/pkg/gradingspec"
+	"github.com/EduCloud-Ecosystem/cairn/pkg/gradingspec"
 )
 
 type fakeCall struct {

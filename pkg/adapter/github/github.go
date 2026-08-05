@@ -30,7 +30,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/quad/quad/pkg/adapter"
+	"github.com/EduCloud-Ecosystem/cairn/pkg/adapter"
 )
 
 const defaultAPIBase = "https://api.github.com"
@@ -419,7 +419,7 @@ func (a *Adapter) EnsureWebhook(ctx context.Context, repo adapter.RepoRef, spec 
 func (a *Adapter) DispatchGrading(_ context.Context, _ adapter.GradingDispatch) error {
 	// GitHub repos that contain an Actions workflow grade automatically on push.
 	// For the portable-runner path, returning ErrNotImplemented signals the
-	// orchestrator to grade on Quad's own sandboxed runners.
+	// orchestrator to grade on Cairn's own sandboxed runners.
 	return adapter.ErrNotImplemented
 }
 
@@ -462,7 +462,7 @@ func (a *Adapter) GradingResult(ctx context.Context, repo adapter.RepoRef, sha s
 	default:
 		out.Status = adapter.CheckPassed
 	}
-	// Numeric Score/MaxScore are left nil: they come from Quad's runner path or a
+	// Numeric Score/MaxScore are left nil: they come from Cairn's runner path or a
 	// later Actions-output convention, not from the bare check-run status.
 	return out, nil
 }

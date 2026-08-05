@@ -24,9 +24,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/quad/quad/internal/store"
-	"github.com/quad/quad/internal/store/migrations"
-	"github.com/quad/quad/pkg/adapter"
+	"github.com/EduCloud-Ecosystem/cairn/internal/store"
+	"github.com/EduCloud-Ecosystem/cairn/internal/store/migrations"
+	"github.com/EduCloud-Ecosystem/cairn/pkg/adapter"
 )
 
 // Store is a PostgreSQL-backed store.Store.

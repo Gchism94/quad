@@ -7,7 +7,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/quad/quad/pkg/adapter"
+	"github.com/EduCloud-Ecosystem/cairn/pkg/adapter"
 )
 
 // ErrNotFound is returned when a requested record does not exist.
@@ -17,7 +17,7 @@ var ErrNotFound = errors.New("store: not found")
 // a duplicate submission for the same assignment + roster entry).
 var ErrConflict = errors.New("store: conflict")
 
-// Store is Quad's persistence interface. The in-memory implementation in
+// Store is Cairn's persistence interface. The in-memory implementation in
 // ./memory backs hermetic tests and local runs; a Postgres implementation
 // (database/sql) is the thin production layer added on top of the same interface.
 //

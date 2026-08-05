@@ -1,4 +1,4 @@
-/quad
+/cairn
 /bin/
 *.test
 .env
@@ -6,8 +6,8 @@ node_modules/
 dist/
 
 # local runtime state and credentials -- never commit
-quad.env
-quad.db
+cairn.env
+cairn.db
 *.db
 .DS_Store
 _git_locks_to_delete/

@@ -67,7 +67,7 @@ export default function App() {
     return (
       <div className="login">
         <div className="login-card">
-          <span className="brand-mark">quad</span>
+          <span className="brand-mark">cairn</span>
           <h1>Instructor console</h1>
           <p className="muted">Sign in with your Git host account to continue.</p>
           <Button variant="primary" onClick={() => (window.location.href = api.loginUrl())}>

@@ -1,4 +1,4 @@
-module github.com/quad/quad
+module github.com/EduCloud-Ecosystem/cairn
 
 go 1.25.0
 

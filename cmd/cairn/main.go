@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-// Command quad runs the Quad control-plane HTTP server.
+// Command cairn runs the Cairn control-plane HTTP server.
 package main
 
 import (
@@ -14,16 +14,16 @@ import (
 	"strings"
 	"time"
 
-	"github.com/quad/quad/internal/api"
-	"github.com/quad/quad/internal/config"
-	"github.com/quad/quad/internal/grading"
-	"github.com/quad/quad/internal/identity"
-	"github.com/quad/quad/internal/provisioning"
-	"github.com/quad/quad/internal/store"
-	"github.com/quad/quad/pkg/adapter"
-	forgejoadapter "github.com/quad/quad/pkg/adapter/forgejo"
-	githubadapter "github.com/quad/quad/pkg/adapter/github"
-	gitlabadapter "github.com/quad/quad/pkg/adapter/gitlab"
+	"github.com/EduCloud-Ecosystem/cairn/internal/api"
+	"github.com/EduCloud-Ecosystem/cairn/internal/config"
+	"github.com/EduCloud-Ecosystem/cairn/internal/grading"
+	"github.com/EduCloud-Ecosystem/cairn/internal/identity"
+	"github.com/EduCloud-Ecosystem/cairn/internal/provisioning"
+	"github.com/EduCloud-Ecosystem/cairn/internal/store"
+	"github.com/EduCloud-Ecosystem/cairn/pkg/adapter"
+	forgejoadapter "github.com/EduCloud-Ecosystem/cairn/pkg/adapter/forgejo"
+	githubadapter "github.com/EduCloud-Ecosystem/cairn/pkg/adapter/github"
+	gitlabadapter "github.com/EduCloud-Ecosystem/cairn/pkg/adapter/gitlab"
 )
 
 // logStartupSummary emits a single structured startup block covering all wired
@@ -40,7 +40,7 @@ func logStartupSummary(storeKind string, adapters map[adapter.Host]adapter.Adapt
 	}
 	adapterLine := strings.Join(adapterHosts, ", ")
 	if adapterLine == "" {
-		adapterLine = "NONE — set QUAD_GITHUB_* and/or QUAD_FORGEJO_*"
+		adapterLine = "NONE — set CAIRN_GITHUB_* and/or CAIRN_FORGEJO_*"
 	}
 
 	// Resolvers
@@ -59,12 +59,12 @@ func logStartupSummary(storeKind string, adapters map[adapter.Host]adapter.Adapt
 	if grader {
 		log.Printf("grading: configured")
 	} else {
-		log.Printf("grading: DISABLED — grade requests will be rejected (set QUAD_GRADER=container)")
+		log.Printf("grading: DISABLED — grade requests will be rejected (set CAIRN_GRADER=container)")
 	}
 	if webDir != "" {
 		log.Printf("dashboard: serving from %s", webDir)
 	} else {
-		log.Printf("dashboard: not mounted — set QUAD_WEB_DIR=web/dist (status page at /)")
+		log.Printf("dashboard: not mounted — set CAIRN_WEB_DIR=web/dist (status page at /)")
 	}
 	if webhookBaseURL != "" {
 		log.Printf("webhook base URL: %s (per repo: %s/webhooks/<host>)", webhookBaseURL, strings.TrimRight(webhookBaseURL, "/"))
@@ -74,7 +74,7 @@ func logStartupSummary(storeKind string, adapters map[adapter.Host]adapter.Adapt
 	// Webhook signing secrets per host (set/unset). A host without a secret cannot
 	// have its deliveries verified, so the receiver will reject them.
 	for _, h := range []adapter.Host{adapter.HostGitHub, adapter.HostForgejo, adapter.HostGitea, adapter.HostGitLab} {
-		state := "unset — deliveries will be rejected (set QUAD_" + envHostKey(h) + "_WEBHOOK_SECRET)"
+		state := "unset — deliveries will be rejected (set CAIRN_" + envHostKey(h) + "_WEBHOOK_SECRET)"
 		if webhookSecrets[h] != "" {
 			state = "set"
 		}
@@ -83,7 +83,7 @@ func logStartupSummary(storeKind string, adapters map[adapter.Host]adapter.Adapt
 }
 
 // envHostKey maps a host to the env-var infix used for its webhook secret.
-// Gitea shares Forgejo's QUAD_FORGEJO_WEBHOOK_SECRET.
+// Gitea shares Forgejo's CAIRN_FORGEJO_WEBHOOK_SECRET.
 func envHostKey(h adapter.Host) string {
 	switch h {
 	case adapter.HostGitHub:
@@ -108,37 +108,37 @@ func main() {
 	queue := provisioning.NewService(st)
 
 	resolvers := map[adapter.Host]identity.Resolver{}
-	if os.Getenv("QUAD_GITHUB_CLIENT_ID") != "" {
+	if os.Getenv("CAIRN_GITHUB_CLIENT_ID") != "" {
 		resolvers[adapter.HostGitHub] = identity.NewGitHub(
-			os.Getenv("QUAD_GITHUB_CLIENT_ID"),
-			os.Getenv("QUAD_GITHUB_CLIENT_SECRET"),
-			os.Getenv("QUAD_OAUTH_REDIRECT_URL"),
+			os.Getenv("CAIRN_GITHUB_CLIENT_ID"),
+			os.Getenv("CAIRN_GITHUB_CLIENT_SECRET"),
+			os.Getenv("CAIRN_OAUTH_REDIRECT_URL"),
 		)
 	}
-	if os.Getenv("QUAD_FORGEJO_OAUTH_CLIENT_ID") != "" {
+	if os.Getenv("CAIRN_FORGEJO_OAUTH_CLIENT_ID") != "" {
 		// The Gitea OAuth2 flow is identical to Forgejo's, so register the same
 		// resolver under both host values — a student claiming a host: gitea
 		// classroom is routed by the resolvers-map key.
 		for _, host := range []adapter.Host{adapter.HostForgejo, adapter.HostGitea} {
 			resolvers[host] = identity.NewForgejoWithHost(
-				os.Getenv("QUAD_FORGEJO_OAUTH_CLIENT_ID"),
-				os.Getenv("QUAD_FORGEJO_OAUTH_CLIENT_SECRET"),
-				os.Getenv("QUAD_OAUTH_REDIRECT_URL"),
-				os.Getenv("QUAD_FORGEJO_BASE_URL"),
+				os.Getenv("CAIRN_FORGEJO_OAUTH_CLIENT_ID"),
+				os.Getenv("CAIRN_FORGEJO_OAUTH_CLIENT_SECRET"),
+				os.Getenv("CAIRN_OAUTH_REDIRECT_URL"),
+				os.Getenv("CAIRN_FORGEJO_BASE_URL"),
 				host,
 			)
 		}
 	}
-	if os.Getenv("QUAD_GITLAB_OAUTH_CLIENT_ID") != "" {
+	if os.Getenv("CAIRN_GITLAB_OAUTH_CLIENT_ID") != "" {
 		resolvers[adapter.HostGitLab] = identity.NewGitLab(
-			os.Getenv("QUAD_GITLAB_OAUTH_CLIENT_ID"),
-			os.Getenv("QUAD_GITLAB_OAUTH_CLIENT_SECRET"),
-			os.Getenv("QUAD_OAUTH_REDIRECT_URL"),
-			os.Getenv("QUAD_GITLAB_BASE_URL"),
+			os.Getenv("CAIRN_GITLAB_OAUTH_CLIENT_ID"),
+			os.Getenv("CAIRN_GITLAB_OAUTH_CLIENT_SECRET"),
+			os.Getenv("CAIRN_OAUTH_REDIRECT_URL"),
+			os.Getenv("CAIRN_GITLAB_BASE_URL"),
 		)
 	}
 	// Operator-login host: explicit env, else GitHub, then Forgejo, then GitLab.
-	loginHost := adapter.Host(os.Getenv("QUAD_OPERATOR_HOST"))
+	loginHost := adapter.Host(os.Getenv("CAIRN_OPERATOR_HOST"))
 	if _, ok := resolvers[loginHost]; !ok {
 		switch {
 		case resolvers[adapter.HostGitHub] != nil:
@@ -157,7 +157,7 @@ func main() {
 		adapters[adapter.HostGitHub] = gh
 	}
 	// Forgejo and Gitea are one adapter family: a hard fork sharing the same
-	// /api/v1 surface, configured by the same QUAD_FORGEJO_* vars. Register the
+	// /api/v1 surface, configured by the same CAIRN_FORGEJO_* vars. Register the
 	// configured instance under BOTH host values (each stamped with its own host)
 	// so a classroom may declare host: forgejo or host: gitea against the same
 	// server.
@@ -193,7 +193,7 @@ func main() {
 	}
 
 	// Grading executes untrusted code. The runner is chosen explicitly via
-	// QUAD_GRADER; nothing runs student code unless configured. See graderFromEnv.
+	// CAIRN_GRADER; nothing runs student code unless configured. See graderFromEnv.
 	grader := graderFromEnv(st)
 	if grader != nil {
 		worker.Grader = grader
@@ -204,17 +204,17 @@ func main() {
 	scheduler := &provisioning.Scheduler{Store: st, Queue: queue, Interval: time.Minute}
 	go scheduler.Run(ctx)
 
-	webDir := os.Getenv("QUAD_WEB_DIR")
+	webDir := os.Getenv("CAIRN_WEB_DIR")
 
-	admins := splitCSV(os.Getenv("QUAD_ADMIN_USERS"))
-	authEnabled := os.Getenv("QUAD_AUTH_DISABLED") != "1" && len(admins) > 0
+	admins := splitCSV(os.Getenv("CAIRN_ADMIN_USERS"))
+	authEnabled := os.Getenv("CAIRN_AUTH_DISABLED") != "1" && len(admins) > 0
 
 	logStartupSummary(storeKind, adapters, resolvers, loginHost, grader != nil, webDir, webhookBaseURL, webhookSecrets)
 
 	if !authEnabled {
-		log.Printf("WARNING: operator authentication is DISABLED — the management API and dashboard are unprotected; set QUAD_ADMIN_USERS (and operator OAuth) to enable it")
+		log.Printf("WARNING: operator authentication is DISABLED — the management API and dashboard are unprotected; set CAIRN_ADMIN_USERS (and operator OAuth) to enable it")
 	} else if len(resolvers) == 0 || loginHost == "" {
-		log.Printf("WARNING: operator auth is enabled but no OAuth resolver is configured — operator login will not work until QUAD_GITHUB_CLIENT_ID or QUAD_FORGEJO_OAUTH_CLIENT_ID is set")
+		log.Printf("WARNING: operator auth is enabled but no OAuth resolver is configured — operator login will not work until CAIRN_GITHUB_CLIENT_ID or CAIRN_FORGEJO_OAUTH_CLIENT_ID is set")
 	}
 
 	srv := api.New(api.Options{
@@ -227,10 +227,10 @@ func main() {
 		WebDir:           webDir,
 		AuthEnabled:      authEnabled,
 		AdminUsers:       admins,
-		CookieSecure:     os.Getenv("QUAD_COOKIE_SECURE") == "1",
+		CookieSecure:     os.Getenv("CAIRN_COOKIE_SECURE") == "1",
 		GraderConfigured: grader != nil,
 	})
-	log.Printf("quad control plane listening on %s", cfg.ListenAddr)
+	log.Printf("cairn control plane listening on %s", cfg.ListenAddr)
 	if err := http.ListenAndServe(cfg.ListenAddr, srv); err != nil {
 		log.Fatal(err)
 	}
@@ -248,14 +248,14 @@ func splitCSV(s string) []string {
 }
 
 // graderFromEnv selects the grading runner from the environment. It returns nil
-// (no grader; grade jobs fail with a clear message) unless QUAD_GRADER is set.
+// (no grader; grade jobs fail with a clear message) unless CAIRN_GRADER is set.
 //
-//	QUAD_GRADER=container         sandboxed container runner (recommended)
-//	QUAD_GRADER=local-exec-unsafe host exec runner — NO isolation; trusted use only
+//	CAIRN_GRADER=container         sandboxed container runner (recommended)
+//	CAIRN_GRADER=local-exec-unsafe host exec runner — NO isolation; trusted use only
 //
-// Container options: QUAD_GRADER_RUNTIME (docker|podman), QUAD_GRADER_IMAGE
-// (default image), QUAD_GRADER_NETWORK (none|restricted),
-// QUAD_GRADER_RESTRICTED_NETWORK (runtime network name), QUAD_GRADER_USER.
+// Container options: CAIRN_GRADER_RUNTIME (docker|podman), CAIRN_GRADER_IMAGE
+// (default image), CAIRN_GRADER_NETWORK (none|restricted),
+// CAIRN_GRADER_RESTRICTED_NETWORK (runtime network name), CAIRN_GRADER_USER.
 // schemeHostFromURL extracts the scheme (e.g. "http") and host (e.g.
 // "localhost:3000") from a base URL. Returns ("", "") when raw is empty or
 // unparseable. The clone path uses both so a plain-http instance is not forced
@@ -273,7 +273,7 @@ func graderFromEnv(st store.Store) provisioning.Grader {
 	// and token to use for each adapter.Host. The token is never embedded in the
 	// clone URL — it is delivered via GIT_ASKPASS (H1 credential hygiene).
 	ghScheme, ghHost := "https", "github.com"
-	if b := os.Getenv("QUAD_GITHUB_BASE_URL"); b != "" {
+	if b := os.Getenv("CAIRN_GITHUB_BASE_URL"); b != "" {
 		if s, h := schemeHostFromURL(b); h != "" {
 			ghScheme, ghHost = s, h // GHES: use the enterprise scheme + hostname
 		}
@@ -283,16 +283,16 @@ func graderFromEnv(st store.Store) provisioning.Grader {
 			Scheme:   ghScheme,
 			Hostname: ghHost,
 			Username: "x-access-token",
-			Token:    os.Getenv("QUAD_GIT_CLONE_TOKEN"),
+			Token:    os.Getenv("CAIRN_GIT_CLONE_TOKEN"),
 		},
 	}
-	if base := os.Getenv("QUAD_FORGEJO_BASE_URL"); base != "" {
+	if base := os.Getenv("CAIRN_FORGEJO_BASE_URL"); base != "" {
 		if s, h := schemeHostFromURL(base); h != "" {
 			creds := grading.CloneCreds{
 				Scheme:   s,
 				Hostname: h,
-				Username: getenvDefault("QUAD_FORGEJO_GIT_USERNAME", "oauth2"),
-				Token:    os.Getenv("QUAD_FORGEJO_TOKEN"),
+				Username: getenvDefault("CAIRN_FORGEJO_GIT_USERNAME", "oauth2"),
+				Token:    os.Getenv("CAIRN_FORGEJO_TOKEN"),
 			}
 			// Same instance, both host labels — a host: gitea classroom's repos
 			// clone with the same credentials.
@@ -300,32 +300,32 @@ func graderFromEnv(st store.Store) provisioning.Grader {
 			hosts[adapter.HostGitea] = creds
 		}
 	}
-	if tok := os.Getenv("QUAD_GITLAB_TOKEN"); tok != "" {
+	if tok := os.Getenv("CAIRN_GITLAB_TOKEN"); tok != "" {
 		// GitLab HTTPS clone uses oauth2:<token> — oauth2 as the username (the
 		// opposite of Forgejo). Base URL defaults to https://gitlab.com.
-		if s, h := schemeHostFromURL(getenvDefault("QUAD_GITLAB_BASE_URL", "https://gitlab.com")); h != "" {
+		if s, h := schemeHostFromURL(getenvDefault("CAIRN_GITLAB_BASE_URL", "https://gitlab.com")); h != "" {
 			hosts[adapter.HostGitLab] = grading.CloneCreds{
 				Scheme:   s,
 				Hostname: h,
-				Username: getenvDefault("QUAD_GITLAB_GIT_USERNAME", "oauth2"),
+				Username: getenvDefault("CAIRN_GITLAB_GIT_USERNAME", "oauth2"),
 				Token:    tok,
 			}
 		}
 	}
 	checkout := grading.NewGitCheckout(hosts)
 
-	switch os.Getenv("QUAD_GRADER") {
+	switch os.Getenv("CAIRN_GRADER") {
 	case "container":
-		runtime := getenvDefault("QUAD_GRADER_RUNTIME", "docker")
+		runtime := getenvDefault("CAIRN_GRADER_RUNTIME", "docker")
 		cr := &grading.ContainerRunner{
 			Runtime:           runtime,
-			DefaultImage:      os.Getenv("QUAD_GRADER_IMAGE"),
-			RestrictedNetwork: os.Getenv("QUAD_GRADER_RESTRICTED_NETWORK"),
-			User:              os.Getenv("QUAD_GRADER_USER"),
+			DefaultImage:      os.Getenv("CAIRN_GRADER_IMAGE"),
+			RestrictedNetwork: os.Getenv("CAIRN_GRADER_RESTRICTED_NETWORK"),
+			User:              os.Getenv("CAIRN_GRADER_USER"),
 		}
 		log.Printf("grading: container runner (runtime=%s image=%q)", runtime, cr.DefaultImage)
 		if cr.DefaultImage == "" {
-			log.Printf("note: QUAD_GRADER_IMAGE is unset; grading requires each spec to set its own image")
+			log.Printf("note: CAIRN_GRADER_IMAGE is unset; grading requires each spec to set its own image")
 		}
 		return grading.NewService(st, cr, checkout)
 
@@ -335,8 +335,8 @@ func graderFromEnv(st store.Store) provisioning.Grader {
 
 	default:
 		// Back-compat: the original opt-in flag maps to the unsafe exec runner.
-		if os.Getenv("QUAD_ENABLE_LOCAL_GRADER") == "1" {
-			log.Printf("DEPRECATED: QUAD_ENABLE_LOCAL_GRADER is deprecated; use QUAD_GRADER=local-exec-unsafe instead")
+		if os.Getenv("CAIRN_ENABLE_LOCAL_GRADER") == "1" {
+			log.Printf("DEPRECATED: CAIRN_ENABLE_LOCAL_GRADER is deprecated; use CAIRN_GRADER=local-exec-unsafe instead")
 			log.Printf("WARNING: local-exec grader runs untrusted code with NO sandbox; use only for trusted/local material")
 			return grading.NewService(st, grading.NewExecRunner(), checkout)
 		}
@@ -351,16 +351,16 @@ func getenvDefault(key, def string) string {
 	return def
 }
 
-// webhookBaseURLFromEnv resolves the public base URL Quad registers webhooks
-// against. The worker appends /webhooks/<host> per repo. QUAD_WEBHOOK_BASE_URL is
-// the current name; QUAD_WEBHOOK_URL is accepted as a deprecated alias (it used to
+// webhookBaseURLFromEnv resolves the public base URL Cairn registers webhooks
+// against. The worker appends /webhooks/<host> per repo. CAIRN_WEBHOOK_BASE_URL is
+// the current name; CAIRN_WEBHOOK_URL is accepted as a deprecated alias (it used to
 // be a full URL, but is now treated as the base for forward compatibility).
 func webhookBaseURLFromEnv() string {
-	if base := os.Getenv("QUAD_WEBHOOK_BASE_URL"); base != "" {
+	if base := os.Getenv("CAIRN_WEBHOOK_BASE_URL"); base != "" {
 		return base
 	}
-	if legacy := os.Getenv("QUAD_WEBHOOK_URL"); legacy != "" {
-		log.Printf("note: QUAD_WEBHOOK_URL is deprecated — rename to QUAD_WEBHOOK_BASE_URL; it is now treated as a base URL and Quad appends /webhooks/<host> per repo")
+	if legacy := os.Getenv("CAIRN_WEBHOOK_URL"); legacy != "" {
+		log.Printf("note: CAIRN_WEBHOOK_URL is deprecated — rename to CAIRN_WEBHOOK_BASE_URL; it is now treated as a base URL and Cairn appends /webhooks/<host> per repo")
 		return legacy
 	}
 	return ""
@@ -371,42 +371,42 @@ func webhookBaseURLFromEnv() string {
 // Gitea-family instance serves both host labels. Hosts with no secret are omitted.
 func webhookSecretsFromEnv() map[adapter.Host]string {
 	secrets := map[adapter.Host]string{}
-	if s := os.Getenv("QUAD_GITHUB_WEBHOOK_SECRET"); s != "" {
+	if s := os.Getenv("CAIRN_GITHUB_WEBHOOK_SECRET"); s != "" {
 		secrets[adapter.HostGitHub] = s
 	}
-	if s := os.Getenv("QUAD_FORGEJO_WEBHOOK_SECRET"); s != "" {
+	if s := os.Getenv("CAIRN_FORGEJO_WEBHOOK_SECRET"); s != "" {
 		secrets[adapter.HostForgejo] = s
 		secrets[adapter.HostGitea] = s
 	}
-	if s := os.Getenv("QUAD_GITLAB_WEBHOOK_SECRET"); s != "" {
+	if s := os.Getenv("CAIRN_GITLAB_WEBHOOK_SECRET"); s != "" {
 		secrets[adapter.HostGitLab] = s
 	}
 	return secrets
 }
 
-// forgejoConfigFromEnv reads the shared QUAD_FORGEJO_* configuration for the
+// forgejoConfigFromEnv reads the shared CAIRN_FORGEJO_* configuration for the
 // Gitea-family adapter. It returns (nil, nil) when neither variable is set. The
 // same config backs both the Forgejo and Gitea host registrations.
 func forgejoConfigFromEnv() (*forgejoadapter.Config, error) {
-	base, tok := os.Getenv("QUAD_FORGEJO_BASE_URL"), os.Getenv("QUAD_FORGEJO_TOKEN")
+	base, tok := os.Getenv("CAIRN_FORGEJO_BASE_URL"), os.Getenv("CAIRN_FORGEJO_TOKEN")
 	if base == "" && tok == "" {
 		return nil, nil // not configured
 	}
 	if base == "" || tok == "" {
-		return nil, fmt.Errorf("forgejo: set both QUAD_FORGEJO_BASE_URL and QUAD_FORGEJO_TOKEN")
+		return nil, fmt.Errorf("forgejo: set both CAIRN_FORGEJO_BASE_URL and CAIRN_FORGEJO_TOKEN")
 	}
 	return &forgejoadapter.Config{BaseURL: base, Token: tok}, nil
 }
 
-// gitlabAdapterFromEnv builds a GitLab adapter when QUAD_GITLAB_TOKEN is set.
+// gitlabAdapterFromEnv builds a GitLab adapter when CAIRN_GITLAB_TOKEN is set.
 // BaseURL defaults to https://gitlab.com. Returns (nil, nil) when unconfigured.
 func gitlabAdapterFromEnv() (*gitlabadapter.Adapter, error) {
-	tok := os.Getenv("QUAD_GITLAB_TOKEN")
+	tok := os.Getenv("CAIRN_GITLAB_TOKEN")
 	if tok == "" {
 		return nil, nil // not configured
 	}
 	return gitlabadapter.New(gitlabadapter.Config{
-		BaseURL: os.Getenv("QUAD_GITLAB_BASE_URL"), // empty → gitlab.com
+		BaseURL: os.Getenv("CAIRN_GITLAB_BASE_URL"), // empty → gitlab.com
 		Token:   tok,
 	})
 }
@@ -414,7 +414,7 @@ func gitlabAdapterFromEnv() (*gitlabadapter.Adapter, error) {
 // githubAdapterFromEnv builds a GitHub App adapter when the relevant environment
 // variables are present. It returns (nil, nil) when unconfigured.
 func githubAdapterFromEnv() (*githubadapter.Adapter, error) {
-	appIDStr := os.Getenv("QUAD_GITHUB_APP_ID")
+	appIDStr := os.Getenv("CAIRN_GITHUB_APP_ID")
 	if appIDStr == "" {
 		return nil, nil
 	}
@@ -422,11 +422,11 @@ func githubAdapterFromEnv() (*githubadapter.Adapter, error) {
 	if err != nil {
 		return nil, err
 	}
-	instID, err := strconv.ParseInt(os.Getenv("QUAD_GITHUB_INSTALLATION_ID"), 10, 64)
+	instID, err := strconv.ParseInt(os.Getenv("CAIRN_GITHUB_INSTALLATION_ID"), 10, 64)
 	if err != nil {
 		return nil, err
 	}
-	keyPEM, err := os.ReadFile(os.Getenv("QUAD_GITHUB_PRIVATE_KEY_FILE"))
+	keyPEM, err := os.ReadFile(os.Getenv("CAIRN_GITHUB_PRIVATE_KEY_FILE"))
 	if err != nil {
 		return nil, err
 	}

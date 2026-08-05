@@ -1,9 +1,9 @@
 {
-  "name": "quad-dashboard",
+  "name": "cairn-dashboard",
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "Instructor console for the Quad control plane.",
+  "description": "Instructor console for the Cairn control plane.",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",

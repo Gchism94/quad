@@ -4,9 +4,9 @@
 // that lives in an assignment's template repo (conventionally grading.yaml). It
 // describes how to build and test student code and how to turn test outcomes
 // into a score, independently of any particular CI system — so the same spec
-// runs on Quad's sandboxed runners, GitHub Actions, or Forgejo Actions.
+// runs on Cairn's sandboxed runners, GitHub Actions, or Forgejo Actions.
 //
-// Permissively licensed (Apache-2.0) so tooling outside Quad can read and write it.
+// Permissively licensed (Apache-2.0) so tooling outside Cairn can read and write it.
 package gradingspec
 
 import "time"

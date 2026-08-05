@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/quad/quad/pkg/adapter"
+	"github.com/EduCloud-Ecosystem/cairn/pkg/adapter"
 )
 
 // GitLab is a Resolver backed by a GitLab instance's OAuth2 flow (gitlab.com or

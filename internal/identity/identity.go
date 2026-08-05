@@ -2,7 +2,7 @@
 
 // Package identity resolves a student's Git-host username from an OAuth flow.
 // This is the privacy-critical entry point: the student authenticates with the
-// host, and the only identifier Quad keeps is the username they already use
+// host, and the only identifier Cairn keeps is the username they already use
 // publicly. No name, SIS ID, or plaintext email is requested or stored.
 package identity
 
@@ -17,7 +17,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/quad/quad/pkg/adapter"
+	"github.com/EduCloud-Ecosystem/cairn/pkg/adapter"
 )
 
 // Resolver turns an OAuth authorization code into the authenticated user's

@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/quad/quad/pkg/adapter"
+	"github.com/EduCloud-Ecosystem/cairn/pkg/adapter"
 )
 
 // newGitCheckout is a test helper that builds a GitCheckout from a variadic list

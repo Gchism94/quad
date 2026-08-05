@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // Package adapter defines the host-agnostic interface that every Git-host
-// integration implements. It is the load-bearing seam that lets Quad work
+// integration implements. It is the load-bearing seam that lets Cairn work
 // against GitHub, GitLab, and self-hosted Forgejo/Gitea without the rest of the
 // system knowing which host it is talking to.
 //
@@ -82,7 +82,7 @@ type WebhookSpec struct {
 
 // GradingDispatch requests a grading run for a repo at a commit. Adapters may
 // satisfy this by triggering host-native CI, or may return ErrNotImplemented to
-// signal that the caller should grade on Quad's own sandboxed runners.
+// signal that the caller should grade on Cairn's own sandboxed runners.
 type GradingDispatch struct {
 	Repo     RepoRef
 	SHA      string
@@ -160,7 +160,7 @@ type Adapter interface {
 	EnsureWebhook(ctx context.Context, repo RepoRef, spec WebhookSpec) error
 
 	// DispatchGrading requests a grading run. Returning ErrNotImplemented signals
-	// the orchestrator to run grading on Quad's own runners instead.
+	// the orchestrator to run grading on Cairn's own runners instead.
 	DispatchGrading(ctx context.Context, d GradingDispatch) error
 
 	// GradingResult reads back a grading/CI result for repo at sha.

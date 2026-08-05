@@ -18,7 +18,7 @@ their final shape:
 - [x] CSV export of scores keyed by username
 - [x] Web dashboard — instructor console (React/TS + Vite in web/); student-facing views are follow-up
 - [x] Durable persistence — PostgreSQL store (`internal/store/postgres`, database/sql) behind `-tags postgres`; in-memory remains the default build
-- [x] Operator authentication — host OAuth + username allowlist, cookie sessions, `created_by` attribution; opt-in via `QUAD_ADMIN_USERS` (open mode otherwise, with a warning)
+- [x] Operator authentication — host OAuth + username allowlist, cookie sessions, `created_by` attribution; opt-in via `CAIRN_ADMIN_USERS` (open mode otherwise, with a warning)
 
 ## Phase 2 — Host-agnostic *(the differentiator)*
 - [x] Forgejo/Gitea adapter — working end to end (README; live-validated)
@@ -30,8 +30,8 @@ their final shape:
 ## Pilot sprint — July–August 2026 (the 1.0-beta gap; see KICKOFF-PROMPT.md)
 Deadline context: pilot-ready before the August 28 shutdown; the pilot course
 integrates for the full semester from the first assignment.
-- [ ] GitHub Classroom import (`quad import ghc`) — the migration path
-- [ ] `quad doctor` self-diagnostics
+- [ ] GitHub Classroom import (`cairn import ghc`) — the migration path
+- [ ] `cairn doctor` self-diagnostics
 - [ ] One-command deploy verified on a clean VM (docs/deploy.md)
 - [ ] Student-facing views completed
 - [ ] docs/migrate-from-github-classroom.md — the afternoon migration guide

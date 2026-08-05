@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/quad/quad/pkg/adapter"
+	"github.com/EduCloud-Ecosystem/cairn/pkg/adapter"
 )
 
 // Forgejo is a Resolver backed by a Forgejo or Gitea instance's OAuth2 flow.

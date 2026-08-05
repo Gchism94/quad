@@ -9,8 +9,8 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/quad/quad/internal/store"
-	"github.com/quad/quad/internal/store/storetest"
+	"github.com/EduCloud-Ecosystem/cairn/internal/store"
+	"github.com/EduCloud-Ecosystem/cairn/internal/store/storetest"
 )
 
 func TestMemoryConformance(t *testing.T) {

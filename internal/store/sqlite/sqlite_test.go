@@ -8,10 +8,10 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/quad/quad/internal/store"
-	"github.com/quad/quad/internal/store/sqlite"
-	"github.com/quad/quad/internal/store/storetest"
-	"github.com/quad/quad/pkg/adapter"
+	"github.com/EduCloud-Ecosystem/cairn/internal/store"
+	"github.com/EduCloud-Ecosystem/cairn/internal/store/sqlite"
+	"github.com/EduCloud-Ecosystem/cairn/internal/store/storetest"
+	"github.com/EduCloud-Ecosystem/cairn/pkg/adapter"
 )
 
 func open(t *testing.T) store.Store {

@@ -1,7 +1,7 @@
 # GitLab setup walkthrough
 
-This guide wires Quad to GitLab — gitlab.com (free, easiest) or a self-hosted
-instance (`QUAD_GITLAB_BASE_URL`). GitLab is a third first-class host alongside
+This guide wires Cairn to GitLab — gitlab.com (free, easiest) or a self-hosted
+instance (`CAIRN_GITLAB_BASE_URL`). GitLab is a third first-class host alongside
 GitHub and the Gitea family; the dashboard, grading spec, and workflow are
 identical regardless of host.
 
@@ -13,23 +13,23 @@ identical regardless of host.
 ## GitLab specifics worth knowing
 
 - **Namespaces are groups.** A classroom's `host_namespace` is a GitLab group path.
-  Quad creates the group via the API if it doesn't exist.
-- **Assignments are forks.** GitLab has no "create from template" endpoint, so Quad
+  Cairn creates the group via the API if it doesn't exist.
+- **Assignments are forks.** GitLab has no "create from template" endpoint, so Cairn
   forks the template project into the group and then breaks the fork relationship
   so the student project is independent. The fork may finish importing
   asynchronously — the project appears immediately; its content lands shortly after.
 - **HTTPS clone uses `oauth2:<token>`** — `oauth2` is the username, the token is the
-  password (the opposite of Forgejo). This is the `QUAD_GITLAB_GIT_USERNAME`
+  password (the opposite of Forgejo). This is the `CAIRN_GITLAB_GIT_USERNAME`
   default.
 - **Webhooks are not HMAC-signed.** GitLab sends the configured secret verbatim in
-  the `X-Gitlab-Token` header; Quad compares it in constant time.
+  the `X-Gitlab-Token` header; Cairn compares it in constant time.
 
 ---
 
 ## Prerequisites
 
 - A GitLab account on gitlab.com or a self-hosted instance you administer.
-- Go 1.25+ on the machine running Quad.
+- Go 1.25+ on the machine running Cairn.
 
 ---
 
@@ -49,9 +49,9 @@ GitLab: **User Settings → Access Tokens → Add new token**, with the **`api`*
 scope (group creation, project fork, member and webhook management).
 
 ```sh
-export QUAD_GITLAB_BASE_URL=https://gitlab.com     # or your self-hosted URL
-export QUAD_GITLAB_TOKEN=glpat-xxxxxxxxxxxxxxxxxxxx
-export QUAD_GITLAB_GIT_USERNAME=oauth2             # default; GitLab HTTPS clone convention
+export CAIRN_GITLAB_BASE_URL=https://gitlab.com     # or your self-hosted URL
+export CAIRN_GITLAB_TOKEN=glpat-xxxxxxxxxxxxxxxxxxxx
+export CAIRN_GITLAB_GIT_USERNAME=oauth2             # default; GitLab HTTPS clone convention
 ```
 
 ---
@@ -62,20 +62,20 @@ GitLab: **User Settings → Applications → Add new application**.
 
 | Field | Value |
 |---|---|
-| Name | `Quad` |
-| Redirect URI | `http://<quad-host>:8080/auth/callback` |
+| Name | `Cairn` |
+| Redirect URI | `http://<cairn-host>:8080/auth/callback` |
 | Confidential | ✓ (checked) |
 | Scopes | `read_user` |
 
 Copy the generated **Application ID** and **Secret**.
 
 ```sh
-export QUAD_GITLAB_OAUTH_CLIENT_ID=<application-id>
-export QUAD_GITLAB_OAUTH_CLIENT_SECRET=<secret>
-export QUAD_OAUTH_REDIRECT_URL=http://<quad-host>:8080/auth/callback
+export CAIRN_GITLAB_OAUTH_CLIENT_ID=<application-id>
+export CAIRN_GITLAB_OAUTH_CLIENT_SECRET=<secret>
+export CAIRN_OAUTH_REDIRECT_URL=http://<cairn-host>:8080/auth/callback
 ```
 
-The redirect URI must match `QUAD_OAUTH_REDIRECT_URL`. A single `/auth/callback`
+The redirect URI must match `CAIRN_OAUTH_REDIRECT_URL`. A single `/auth/callback`
 serves every host; the state parameter carries the host so callbacks route
 correctly.
 
@@ -85,34 +85,34 @@ durable identity anchor (so a renamed student keeps the same row).
 
 ---
 
-## 4. Start Quad
+## 4. Start Cairn
 
 A complete operator environment (concrete values; operator `alice`, group `cs101`),
-all in the **same shell** that runs Quad:
+all in the **same shell** that runs Cairn:
 
 ```sh
-export QUAD_GITLAB_BASE_URL=https://gitlab.com
-export QUAD_GITLAB_TOKEN=glpat-xxxxxxxxxxxxxxxxxxxx
-export QUAD_GITLAB_GIT_USERNAME=oauth2
-export QUAD_GITLAB_OAUTH_CLIENT_ID=abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789
-export QUAD_GITLAB_OAUTH_CLIENT_SECRET=gloas-secret-value-here
-export QUAD_OAUTH_REDIRECT_URL=http://localhost:8080/auth/callback
-export QUAD_OPERATOR_HOST=gitlab
-export QUAD_ADMIN_USERS=alice
+export CAIRN_GITLAB_BASE_URL=https://gitlab.com
+export CAIRN_GITLAB_TOKEN=glpat-xxxxxxxxxxxxxxxxxxxx
+export CAIRN_GITLAB_GIT_USERNAME=oauth2
+export CAIRN_GITLAB_OAUTH_CLIENT_ID=abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789
+export CAIRN_GITLAB_OAUTH_CLIENT_SECRET=gloas-secret-value-here
+export CAIRN_OAUTH_REDIRECT_URL=http://localhost:8080/auth/callback
+export CAIRN_OPERATOR_HOST=gitlab
+export CAIRN_ADMIN_USERS=alice
 # grading (optional, step 8):
-export QUAD_GRADER=container
-export QUAD_GRADER_IMAGE=python:3.12
+export CAIRN_GRADER=container
+export CAIRN_GRADER_IMAGE=python:3.12
 
-go run ./cmd/quad
+go run ./cmd/cairn
 ```
 
 Startup summary (abridged):
 
 ```
-store: sqlite /absolute/path/to/quad.db
+store: sqlite /absolute/path/to/cairn.db
 adapters registered: gitlab
 identity resolvers: gitlab  operator-host: gitlab
-quad control plane listening on :8080
+cairn control plane listening on :8080
 ```
 
 ---
@@ -122,7 +122,7 @@ quad control plane listening on :8080
 1. **Operator login** — visit `http://localhost:8080/auth/login`, authenticate as
    `alice`, then:
    ```sh
-   curl -s --cookie "quad_session=…" http://localhost:8080/auth/me   # {"username":"alice", ...}
+   curl -s --cookie "cairn_session=…" http://localhost:8080/auth/me   # {"username":"alice", ...}
    ```
 2. **Classroom → assignment** — `host: gitlab`, the group as `host_namespace`:
    ```sh
@@ -136,11 +136,11 @@ quad control plane listening on :8080
           "template":{"host":"gitlab","namespace":"instr","name":"hw1-template"}}'
    ```
 3. **Student claim** — open `http://localhost:8080/assignments/<assignment-id>/accept`
-   in a private window, authenticate as a student. Quad provisions
+   in a private window, authenticate as a student. Cairn provisions
    `cs101/hw-1-<student>` (a fork with the relationship broken), adds the student as
    a project member, and lands them on **`/me`** with their repo link, deadline, and
    grading status. If the roster user is already an Owner/Maintainer of the target
-   group (e.g. the instructor testing with their own account, or a TA), Quad skips
+   group (e.g. the instructor testing with their own account, or a TA), Cairn skips
    the redundant member add — they already have access.
 4. **Grading + push regrade** — trigger grading; clones use `oauth2:<token>`. With a
    webhook configured (step 7), a `git push` re-runs grading and `/me` updates live.
@@ -150,12 +150,12 @@ quad control plane listening on :8080
 ## 6. Configure grading (optional)
 
 ```sh
-export QUAD_GRADER=container
-export QUAD_GRADER_IMAGE=python:3.12   # default; specs may override
-export QUAD_GRADER_RUNTIME=docker      # or podman
+export CAIRN_GRADER=container
+export CAIRN_GRADER_IMAGE=python:3.12   # default; specs may override
+export CAIRN_GRADER_RUNTIME=docker      # or podman
 ```
 
-The grading checkout clones GitLab repos as `oauth2:<QUAD_GITLAB_TOKEN>` over HTTPS;
+The grading checkout clones GitLab repos as `oauth2:<CAIRN_GITLAB_TOKEN>` over HTTPS;
 the token is delivered via `GIT_ASKPASS`, never embedded in the URL. Trigger a run:
 
 ```sh
@@ -168,18 +168,18 @@ curl -s -X POST \
 
 ## 7. Webhooks (auto-regrade on push)
 
-Quad registers the webhook on each project when `QUAD_WEBHOOK_BASE_URL` is set,
+Cairn registers the webhook on each project when `CAIRN_WEBHOOK_BASE_URL` is set,
 appending `/webhooks/gitlab` per project. GitLab authenticates the delivery with the
 `X-Gitlab-Token` header (not an HMAC).
 
 ```sh
-# Public BASE URL of Quad. Quad appends /webhooks/gitlab per repo. Must be
+# Public BASE URL of Cairn. Cairn appends /webhooks/gitlab per repo. Must be
 # reachable BY GITLAB.
-export QUAD_WEBHOOK_BASE_URL=https://your-quad-host
-export QUAD_GITLAB_WEBHOOK_SECRET=$(openssl rand -hex 32)
+export CAIRN_WEBHOOK_BASE_URL=https://your-cairn-host
+export CAIRN_GITLAB_WEBHOOK_SECRET=$(openssl rand -hex 32)
 ```
 
-Restart Quad and confirm the startup summary shows the webhook base URL and
+Restart Cairn and confirm the startup summary shows the webhook base URL and
 `webhook secret [gitlab]: set`.
 
 > **Reachability gotcha.** The webhook is called by **GitLab**, not your laptop. On
@@ -199,16 +199,16 @@ Restart Quad and confirm the startup summary shows the webhook base URL and
 | Group not found / create fails | The token lacks the `api` scope or permission to create top-level groups. Create the group manually and grant the token access, or use an existing group as `host_namespace`. |
 | Fork fails | The template project isn't accessible to the token (visibility/ownership), or the token can't fork into the target group. Make the template internal/public or owned by the token user. |
 | Member add fails (`no user with username`) | The student has no account on this GitLab instance yet, or never logged in. They must have an account; usernames resolve via `GET /users?username=`. |
-| Webhook delivery `401` | The `X-Gitlab-Token` doesn't match `QUAD_GITLAB_WEBHOOK_SECRET`. Re-set both to the same value. |
+| Webhook delivery `401` | The `X-Gitlab-Token` doesn't match `CAIRN_GITLAB_WEBHOOK_SECRET`. Re-set both to the same value. |
 | Webhook `204`, no grading | The push didn't match a tracked project (wrong group/path), or it was a non-push event (`object_kind` ≠ `push`, e.g. a tag push). |
-| Clone `401` during grading | `oauth2:<token>` failed — confirm `QUAD_GITLAB_TOKEN` has `read_repository`/`api` and access to the project. As a fallback, set `QUAD_GITLAB_GIT_USERNAME` to the token owner's username. |
-| Fork/import still empty | The fork import is still running (asynchronous). Quad tolerates this — content arrives shortly; re-grade once it lands. |
+| Clone `401` during grading | `oauth2:<token>` failed — confirm `CAIRN_GITLAB_TOKEN` has `read_repository`/`api` and access to the project. As a fallback, set `CAIRN_GITLAB_GIT_USERNAME` to the token owner's username. |
+| Fork/import still empty | The fork import is still running (asynchronous). Cairn tolerates this — content arrives shortly; re-grade once it lands. |
 
 ---
 
 ## Next
 
-A single Quad deployment can serve GitLab, GitHub, and Forgejo/Gitea classrooms at
+A single Cairn deployment can serve GitLab, GitHub, and Forgejo/Gitea classrooms at
 once — each classroom carries its own host. See the
 [GitHub](github-setup.md) and [Forgejo](forgejo-setup.md) guides, and the
 [migration notes](migrating-github-to-forgejo.md) for moving courses between hosts.

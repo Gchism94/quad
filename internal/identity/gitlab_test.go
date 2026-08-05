@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/quad/quad/pkg/adapter"
+	"github.com/EduCloud-Ecosystem/cairn/pkg/adapter"
 )
 
 func TestGitLabHost(t *testing.T) {
@@ -28,7 +28,7 @@ func TestGitLabDefaultsBaseURL(t *testing.T) {
 }
 
 func TestGitLabAuthorizeURL(t *testing.T) {
-	g := NewGitLab("my-client", "secret", "https://quad.example/auth/callback", "https://gitlab.example.org")
+	g := NewGitLab("my-client", "secret", "https://cairn.example/auth/callback", "https://gitlab.example.org")
 	got := g.AuthorizeURL("test-state")
 
 	parsed, err := url.Parse(got)

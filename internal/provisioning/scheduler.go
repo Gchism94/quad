@@ -7,7 +7,7 @@ import (
 	"log"
 	"time"
 
-	"github.com/quad/quad/internal/store"
+	"github.com/EduCloud-Ecosystem/cairn/internal/store"
 )
 
 // Scheduler enforces assignment deadlines. On each tick it finds assignments

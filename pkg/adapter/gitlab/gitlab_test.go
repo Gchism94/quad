@@ -9,7 +9,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/quad/quad/pkg/adapter"
+	"github.com/EduCloud-Ecosystem/cairn/pkg/adapter"
 )
 
 var bg = context.Background()
@@ -490,7 +490,7 @@ func TestEnsureWebhookCreate(t *testing.T) {
 			}
 			var body map[string]any
 			json.NewDecoder(r.Body).Decode(&body)
-			if body["url"] != "https://quad/webhooks/gitlab" || body["push_events"] != true || body["token"] != "shh" {
+			if body["url"] != "https://cairn/webhooks/gitlab" || body["push_events"] != true || body["token"] != "shh" {
 				t.Errorf("hook body = %+v", body)
 			}
 			w.WriteHeader(http.StatusCreated)
@@ -500,7 +500,7 @@ func TestEnsureWebhookCreate(t *testing.T) {
 	}))
 	defer srv.Close()
 	err := newTestAdapter(t, srv).EnsureWebhook(bg, adapter.RepoRef{Namespace: "cs101", Name: "hw1"},
-		adapter.WebhookSpec{URL: "https://quad/webhooks/gitlab", Secret: "shh", Events: []string{"push"}})
+		adapter.WebhookSpec{URL: "https://cairn/webhooks/gitlab", Secret: "shh", Events: []string{"push"}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -515,7 +515,7 @@ func TestEnsureWebhookUpdatesExisting(t *testing.T) {
 		calls++
 		switch calls {
 		case 1: // list → existing hook with same URL
-			w.Write([]byte(`[{"id":55,"url":"https://quad/webhooks/gitlab"}]`))
+			w.Write([]byte(`[{"id":55,"url":"https://cairn/webhooks/gitlab"}]`))
 		case 2: // PUT update
 			if r.Method != http.MethodPut || r.URL.Path != "/api/v4/projects/cs101/hw1/hooks/55" {
 				t.Errorf("call 2: %s %s", r.Method, r.URL.Path)
@@ -527,7 +527,7 @@ func TestEnsureWebhookUpdatesExisting(t *testing.T) {
 	}))
 	defer srv.Close()
 	err := newTestAdapter(t, srv).EnsureWebhook(bg, adapter.RepoRef{Namespace: "cs101", Name: "hw1"},
-		adapter.WebhookSpec{URL: "https://quad/webhooks/gitlab", Secret: "shh"})
+		adapter.WebhookSpec{URL: "https://cairn/webhooks/gitlab", Secret: "shh"})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -13,11 +13,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/quad/quad/internal/provisioning"
-	"github.com/quad/quad/pkg/adapter"
+	"github.com/EduCloud-Ecosystem/cairn/internal/provisioning"
+	"github.com/EduCloud-Ecosystem/cairn/pkg/adapter"
 )
 
-// pushPayload is the subset of a host push event Quad needs across all hosts.
+// pushPayload is the subset of a host push event Cairn needs across all hosts.
 // GitHub/Gitea/Forgejo use repository.{name, owner.login|username} + after;
 // GitLab uses project.{name, path_with_namespace} + checkout_sha and marks the
 // event type in object_kind.

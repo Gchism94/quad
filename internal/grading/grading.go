@@ -23,10 +23,10 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/quad/quad/internal/id"
-	"github.com/quad/quad/internal/store"
-	"github.com/quad/quad/pkg/adapter"
-	"github.com/quad/quad/pkg/gradingspec"
+	"github.com/EduCloud-Ecosystem/cairn/internal/id"
+	"github.com/EduCloud-Ecosystem/cairn/internal/store"
+	"github.com/EduCloud-Ecosystem/cairn/pkg/adapter"
+	"github.com/EduCloud-Ecosystem/cairn/pkg/gradingspec"
 )
 
 // TestResult is the outcome of a single graded check.
@@ -142,7 +142,7 @@ func (s *Service) Grade(ctx context.Context, submissionID string) error {
 }
 
 func (s *Service) execute(ctx context.Context, repo adapter.RepoRef, specPath string) (Result, error) {
-	dir, err := os.MkdirTemp("", "quad-grade-*")
+	dir, err := os.MkdirTemp("", "cairn-grade-*")
 	if err != nil {
 		return Result{}, err
 	}

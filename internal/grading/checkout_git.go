@@ -9,7 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 
-	"github.com/quad/quad/pkg/adapter"
+	"github.com/EduCloud-Ecosystem/cairn/pkg/adapter"
 )
 
 // CloneCreds holds the clone endpoint and credentials for one Git host.
@@ -29,7 +29,7 @@ type CloneCreds struct {
 // unknown host returns an error immediately — there is no implicit fallback.
 //
 // Credential hygiene (H1): the token is injected via GIT_ASKPASS and the
-// $QUAD_GIT_TOKEN environment variable. It never appears in process arguments,
+// $CAIRN_GIT_TOKEN environment variable. It never appears in process arguments,
 // the clone URL, or .git/config, so it cannot be read by untrusted student code
 // in the grading container (which mounts the checkout read-write as /work).
 type GitCheckout struct {
@@ -90,7 +90,7 @@ func (g *GitCheckout) Fetch(ctx context.Context, repo adapter.RepoRef, dir strin
 		// Write a temporary askpass helper to a scratch directory that is separate
 		// from the checkout directory so it is never bind-mounted into the
 		// grading container alongside the student submission.
-		scratch, err := os.MkdirTemp("", "quad-askpass-*")
+		scratch, err := os.MkdirTemp("", "cairn-askpass-*")
 		if err != nil {
 			return fmt.Errorf("askpass scratch: %w", err)
 		}
@@ -100,12 +100,12 @@ func (g *GitCheckout) Fetch(ctx context.Context, repo adapter.RepoRef, dir strin
 		// The helper is invoked by git with the credential prompt as its first
 		// argument. It echoes the token regardless of the prompt, which is safe
 		// because git only calls GIT_ASKPASS for the password field.
-		const script = "#!/bin/sh\nexec printf '%s\\n' \"$QUAD_GIT_TOKEN\"\n"
+		const script = "#!/bin/sh\nexec printf '%s\\n' \"$CAIRN_GIT_TOKEN\"\n"
 		if err := os.WriteFile(askpass, []byte(script), 0o700); err != nil {
 			return fmt.Errorf("write askpass: %w", err)
 		}
 
-		env = append(env, "GIT_ASKPASS="+askpass, "QUAD_GIT_TOKEN="+token)
+		env = append(env, "GIT_ASKPASS="+askpass, "CAIRN_GIT_TOKEN="+token)
 	}
 
 	args = append(args, cloneURL, dir)

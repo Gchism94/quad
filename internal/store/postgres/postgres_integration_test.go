@@ -3,10 +3,10 @@
 //go:build postgres
 
 // Integration tests for the PostgreSQL store. They are compiled only with
-// -tags postgres and skip unless QUAD_TEST_DATABASE_URL points at a database
+// -tags postgres and skip unless CAIRN_TEST_DATABASE_URL points at a database
 // you don't mind being TRUNCATEd. Run locally with:
 //
-//	QUAD_TEST_DATABASE_URL=postgres://quad:quad@localhost:5432/quad?sslmode=disable \
+//	CAIRN_TEST_DATABASE_URL=postgres://cairn:cairn@localhost:5432/cairn?sslmode=disable \
 //	  go test -tags postgres ./internal/store/postgres
 package postgres
 
@@ -20,15 +20,15 @@ import (
 
 	_ "github.com/jackc/pgx/v5/stdlib"
 
-	"github.com/quad/quad/internal/store"
-	"github.com/quad/quad/pkg/adapter"
+	"github.com/EduCloud-Ecosystem/cairn/internal/store"
+	"github.com/EduCloud-Ecosystem/cairn/pkg/adapter"
 )
 
 func testStore(t *testing.T) *Store {
 	t.Helper()
-	dsn := os.Getenv("QUAD_TEST_DATABASE_URL")
+	dsn := os.Getenv("CAIRN_TEST_DATABASE_URL")
 	if dsn == "" {
-		t.Skip("set QUAD_TEST_DATABASE_URL to run Postgres integration tests")
+		t.Skip("set CAIRN_TEST_DATABASE_URL to run Postgres integration tests")
 	}
 	db, err := sql.Open("pgx", dsn)
 	if err != nil {

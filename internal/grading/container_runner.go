@@ -13,8 +13,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/quad/quad/internal/id"
-	"github.com/quad/quad/pkg/gradingspec"
+	"github.com/EduCloud-Ecosystem/cairn/internal/id"
+	"github.com/EduCloud-Ecosystem/cairn/pkg/gradingspec"
 )
 
 // ContainerRunner executes a grading spec inside a container, enforcing the
@@ -31,7 +31,7 @@ import (
 //   - --cap-drop ALL, --security-opt no-new-privileges, --read-only rootfs.
 //   - a writable /work bind mount (the throwaway checkout) and a /tmp tmpfs; the
 //     rest of the filesystem is read-only.
-//   - runs as the server's own uid:gid by default (QUAD_GRADER_USER overrides).
+//   - runs as the server's own uid:gid by default (CAIRN_GRADER_USER overrides).
 //
 // The host performs the checkout (cloning a repo is not code execution); only the
 // commands from the spec run inside the container, against the mounted clone.
@@ -43,7 +43,7 @@ type ContainerRunner struct {
 	Runtime           string   // "docker" (default) or "podman"
 	DefaultImage      string   // used when a spec sets no image
 	RestrictedNetwork string   // runtime network name for NetworkRestricted
-	User              string   // --user value; default is the server's own uid:gid (set QUAD_GRADER_USER to override)
+	User              string   // --user value; default is the server's own uid:gid (set CAIRN_GRADER_USER to override)
 	ExtraArgs         []string // additional runtime args (advanced)
 
 	DefaultTimeout  time.Duration // per-step fallback; default 30s
@@ -296,7 +296,7 @@ func (r *ContainerRunner) Run(ctx context.Context, spec gradingspec.Spec, dir st
 // best-effort if the step times out (the runtime CLI dying does not stop the
 // container the daemon owns).
 func (r *ContainerRunner) exec1(ctx context.Context, cr commandRunner, rt, image, command string, lim resolvedLimits, dir string) (cmdResult, error) {
-	name := "quad-grade-" + id.New()
+	name := "cairn-grade-" + id.New()
 	out, err := cr.run(ctx, rt, r.buildRunArgs(image, command, lim, dir, name), lim.timeout)
 	if err != nil {
 		return out, err

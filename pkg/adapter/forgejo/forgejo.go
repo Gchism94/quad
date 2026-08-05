@@ -10,7 +10,7 @@
 //     branch (git_content). opts.IncludeAllBranches is ignored. The template
 //     repository must be marked as a template on the Forgejo/Gitea instance.
 //   - GradingResult: uses the combined commit status endpoint; numeric scores
-//     come from Quad's own runner path, not from this endpoint.
+//     come from Cairn's own runner path, not from this endpoint.
 package forgejo
 
 import (
@@ -24,7 +24,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/quad/quad/pkg/adapter"
+	"github.com/EduCloud-Ecosystem/cairn/pkg/adapter"
 )
 
 // Config holds credentials for a Forgejo or Gitea instance.
@@ -34,7 +34,7 @@ type Config struct {
 }
 
 // Adapter implements adapter.Adapter for Forgejo / Gitea. Forgejo is a hard fork
-// of Gitea and the two still share the /api/v1 surface for every endpoint Quad
+// of Gitea and the two still share the /api/v1 surface for every endpoint Cairn
 // uses, so a single implementation serves both. The target host is a field, not a
 // literal, so one binary can register the same instance under both host values
 // and stamp returned refs with the right one — letting the impls diverge later
@@ -361,14 +361,14 @@ func (a *Adapter) EnsureWebhook(ctx context.Context, repo adapter.RepoRef, spec 
 }
 
 // DispatchGrading returns ErrNotImplemented. Forgejo Actions could dispatch
-// grading natively in a future phase; for now Quad's own sandboxed runners
+// grading natively in a future phase; for now Cairn's own sandboxed runners
 // handle all grading.
 func (a *Adapter) DispatchGrading(_ context.Context, _ adapter.GradingDispatch) error {
 	return adapter.ErrNotImplemented
 }
 
 // GradingResult reads the combined commit status for sha and maps it to a
-// CheckResult. Numeric scores are not populated here; they come from Quad's
+// CheckResult. Numeric scores are not populated here; they come from Cairn's
 // runner path.
 func (a *Adapter) GradingResult(ctx context.Context, repo adapter.RepoRef, sha string) (adapter.CheckResult, error) {
 	path := "/repos/" + repo.Namespace + "/" + repo.Name + "/commits/" + sha + "/status"

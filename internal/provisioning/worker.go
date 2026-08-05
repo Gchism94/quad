@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/quad/quad/internal/store"
-	"github.com/quad/quad/pkg/adapter"
+	"github.com/EduCloud-Ecosystem/cairn/internal/store"
+	"github.com/EduCloud-Ecosystem/cairn/pkg/adapter"
 )
 
 // Grader runs grading for a submission. It is satisfied by the grading package's
@@ -27,8 +27,8 @@ type Worker struct {
 	Store    store.Store
 	Adapters map[adapter.Host]adapter.Adapter
 	Grader   Grader // optional; nil means grade jobs fail with a clear error
-	// WebhookBaseURL is the public base URL of this Quad instance (e.g.
-	// https://quad.example). When set, each provisioned repo gets a push webhook at
+	// WebhookBaseURL is the public base URL of this Cairn instance (e.g.
+	// https://cairn.example). When set, each provisioned repo gets a push webhook at
 	// <base>/webhooks/<host>, so a delivery always reaches the handler that knows
 	// how to verify that host (HMAC for github/gitea/forgejo; token for gitlab).
 	WebhookBaseURL string

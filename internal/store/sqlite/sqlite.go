@@ -26,8 +26,8 @@ import (
 
 	_ "modernc.org/sqlite" // registers the "sqlite" database/sql driver
 
-	"github.com/quad/quad/internal/store"
-	"github.com/quad/quad/pkg/adapter"
+	"github.com/EduCloud-Ecosystem/cairn/internal/store"
+	"github.com/EduCloud-Ecosystem/cairn/pkg/adapter"
 )
 
 // Store is a SQLite-backed store.Store.

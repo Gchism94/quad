@@ -1,4 +1,4 @@
--- 0001_init.up.sql — Quad initial schema.
+-- 0001_init.up.sql — Cairn initial schema.
 --
 -- PRIVACY: this schema has no column for a student's legal name, SIS ID, or
 -- plaintext email. A student's identity anchor is their Git-host username

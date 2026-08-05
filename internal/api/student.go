@@ -9,8 +9,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/quad/quad/internal/grading"
-	"github.com/quad/quad/internal/store"
+	"github.com/EduCloud-Ecosystem/cairn/internal/grading"
+	"github.com/EduCloud-Ecosystem/cairn/internal/store"
 )
 
 // gradeView is a student-facing grade summary. No PII — scores and a timestamp.

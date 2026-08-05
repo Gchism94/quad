@@ -11,13 +11,13 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/quad/quad/pkg/adapter"
+	"github.com/EduCloud-Ecosystem/cairn/pkg/adapter"
 )
 
 func newForgejoTestServer(t *testing.T, handler http.Handler) (*Forgejo, *httptest.Server) {
 	t.Helper()
 	srv := httptest.NewServer(handler)
-	f := NewForgejo("client-id", "client-secret", "https://quad.example/auth/callback", srv.URL)
+	f := NewForgejo("client-id", "client-secret", "https://cairn.example/auth/callback", srv.URL)
 	f.HTTPClient = srv.Client()
 	return f, srv
 }
@@ -71,7 +71,7 @@ func TestGiteaResolverHost(t *testing.T) {
 }
 
 func TestForgejoAuthorizeURL(t *testing.T) {
-	f := NewForgejo("my-client", "secret", "https://quad.example/auth/callback", "https://forgejo.example.org")
+	f := NewForgejo("my-client", "secret", "https://cairn.example/auth/callback", "https://forgejo.example.org")
 	got := f.AuthorizeURL("test-state")
 
 	parsed, err := url.Parse(got)

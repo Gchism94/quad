@@ -1,6 +1,6 @@
 # Kickoff prompt for Claude Code — Cairn pilot sprint
 
-Repo: `~/dev/quad` (Cairn; remote `EduCloud-Ecosystem/cairn`). Goal: **pilot-ready
+Repo: `~/dev/cairn` (Cairn; remote `EduCloud-Ecosystem/cairn`). Goal: **pilot-ready
 before the August 28 GitHub Classroom shutdown**, running semester-long in the
 maintainer's own course from the first assignment. Three sessions, in order.
 Open Claude Code in the repo and paste the session prompt. Start in plan mode.
@@ -45,7 +45,7 @@ platform: it is the difference between an alternative and a replacement.
 
 1. Inspect first (constraint 4): document the real export surface in
    docs/ghc-import.md.
-2. Build `quad import ghc --org <org> --roster <roster.csv> [--dry-run]`:
+2. Build `cairn import ghc --org <org> --roster <roster.csv> [--dry-run]`:
    - create a Cairn classroom from the Classroom org
    - bind usernames from the roster CSV (username + identifier columns as
      found in step 1)
@@ -66,13 +66,13 @@ Deliverable: docs/ghc-import.md findings note + the importer.
 ```
 Scope: the paved path an instructor can follow alone.
 
-1. `quad doctor`: check DB reachability (and which store build is running),
+1. `cairn doctor`: check DB reachability (and which store build is running),
    host-adapter credentials, webhook secret configuration, container runtime
    presence, port availability. Every failure prints what to do about it.
 2. Verify deploy/docker-compose.yml on a clean VM end to end; fix what breaks;
    write docs/deploy.md (the exact commands, nothing implied).
 
-Accept: fresh VM → docker compose up → `quad doctor` green → instructor
+Accept: fresh VM → docker compose up → `cairn doctor` green → instructor
 creates a classroom in the dashboard. ROADMAP boxes updated.
 ```
 

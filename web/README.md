@@ -1,6 +1,6 @@
-# Quad — Instructor Console
+# Cairn — Instructor Console
 
-A React + TypeScript single-page app for operating the Quad control plane:
+A React + TypeScript single-page app for operating the Cairn control plane:
 classrooms, assignments, roster, submission status and scores, deadlines, and the
 lock / unlock / grade actions. It talks only to the control-plane HTTP API.
 
@@ -10,7 +10,7 @@ The dashboard expects the Go control plane running on `:8080`:
 
 ```sh
 # terminal 1 — API
-cd .. && go run ./cmd/quad            # listens on :8080 by default
+cd .. && go run ./cmd/cairn            # listens on :8080 by default
 
 # terminal 2 — dashboard
 npm install
@@ -19,7 +19,7 @@ npm run dev                            # http://localhost:5173
 
 In dev, Vite proxies the API path prefixes (`/classrooms`, `/assignments`,
 `/auth`, `/healthz`) to the Go server, so the browser stays same-origin and no
-CORS configuration is needed. Point the proxy elsewhere with `QUAD_API_URL`.
+CORS configuration is needed. Point the proxy elsewhere with `CAIRN_API_URL`.
 
 ## Build
 
@@ -33,7 +33,7 @@ server itself) so the app's relative API calls resolve. The simplest path is to
 let the control plane serve it directly — one binary, one origin, no CORS:
 
 ```sh
-QUAD_WEB_DIR=dist go run ../cmd/quad     # API + dashboard on :8080
+CAIRN_WEB_DIR=dist go run ../cmd/cairn     # API + dashboard on :8080
 ```
 
 To target a different API origin at build time, set `VITE_API_BASE`.

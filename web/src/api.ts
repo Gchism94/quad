@@ -1,4 +1,4 @@
-// Typed client for the Quad control-plane API. Field names match the server's
+// Typed client for the Cairn control-plane API. Field names match the server's
 // snake_case JSON. The base URL is empty by default (same-origin); in dev the
 // Vite proxy forwards API prefixes to the Go server.
 

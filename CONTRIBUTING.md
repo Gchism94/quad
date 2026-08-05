@@ -1,4 +1,4 @@
-# Contributing to Quad
+# Contributing to Cairn
 
 Thanks for helping build a tool educators can trust. This is an early-stage
 project; the architecture is settled but most behavior is unimplemented.
@@ -9,7 +9,7 @@ project; the architecture is settled but most behavior is unimplemented.
 go build ./...        # whole tree must compile
 go vet ./...
 gofmt -l .            # must print nothing
-go run ./cmd/quad     # GET /healthz on :8080
+go run ./cmd/cairn     # GET /healthz on :8080
 ```
 
 ## Where to start

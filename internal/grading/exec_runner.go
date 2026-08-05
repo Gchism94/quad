@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/quad/quad/pkg/gradingspec"
+	"github.com/EduCloud-Ecosystem/cairn/pkg/gradingspec"
 )
 
 // ExecRunner runs a grading spec by executing each test command in a shell on

@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/quad/quad/pkg/adapter"
+	"github.com/EduCloud-Ecosystem/cairn/pkg/adapter"
 )
 
 // assertAuth checks that the request carries the expected bearer token.
@@ -618,7 +618,7 @@ func TestEnsureWebhookCreate(t *testing.T) {
 				t.Errorf("type = %v, want gitea", body["type"])
 			}
 			cfg, _ := body["config"].(map[string]any)
-			if cfg["url"] != "https://quad.example/hook" {
+			if cfg["url"] != "https://cairn.example/hook" {
 				t.Errorf("config.url = %v", cfg["url"])
 			}
 			if cfg["content_type"] != "json" {
@@ -638,7 +638,7 @@ func TestEnsureWebhookCreate(t *testing.T) {
 	a := newTestAdapter(t, srv)
 	if err := a.EnsureWebhook(bg,
 		adapter.RepoRef{Host: adapter.HostForgejo, Namespace: "org", Name: "repo"},
-		adapter.WebhookSpec{URL: "https://quad.example/hook", Secret: "mysecret"},
+		adapter.WebhookSpec{URL: "https://cairn.example/hook", Secret: "mysecret"},
 	); err != nil {
 		t.Fatal(err)
 	}
@@ -650,7 +650,7 @@ func TestEnsureWebhookCreate(t *testing.T) {
 func TestEnsureWebhookIdempotent(t *testing.T) {
 	calls := 0
 	existing := []map[string]any{
-		{"id": 1, "config": map[string]any{"url": "https://quad.example/hook"}},
+		{"id": 1, "config": map[string]any{"url": "https://cairn.example/hook"}},
 	}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		calls++
@@ -664,7 +664,7 @@ func TestEnsureWebhookIdempotent(t *testing.T) {
 	a := newTestAdapter(t, srv)
 	if err := a.EnsureWebhook(bg,
 		adapter.RepoRef{Host: adapter.HostForgejo, Namespace: "org", Name: "repo"},
-		adapter.WebhookSpec{URL: "https://quad.example/hook"},
+		adapter.WebhookSpec{URL: "https://cairn.example/hook"},
 	); err != nil {
 		t.Fatal(err)
 	}

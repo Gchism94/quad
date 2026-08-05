@@ -1,6 +1,7 @@
 # Design Doc — Open-Source Classroom Platform
 
-> **Working name: Quad** (placeholder — "university quad / common ground"; swap freely). **[OPEN]**
+> **Name: Cairn.** Developed under the working name Quad; the rename to Cairn is
+> settled (§13).
 > Status: **v1 in progress.** The core vertical slice is validated end-to-end against
 > both the GitHub model and a self-hosted **Forgejo/Gitea** instance (OAuth →
 > roster → repo provisioning from template → sandboxed grading). Items still needing
@@ -68,7 +69,7 @@ burned by platform risk.
 - **Student-facing experience** — a student view with repo link, instructions,
   deadline, grading status, and per-test results; the submit→regrade→improve loop
   (see §8, §12).
-- **Durable by default** + **one-command bring-up** + **`quad doctor`** preflight
+- **Durable by default** + **one-command bring-up** + **`cairn doctor`** preflight
   (see §9, §12).
 - CSV export of scores keyed by username; full data export.
 - A clean web dashboard (instructor + student).
@@ -288,11 +289,11 @@ minute limits, which tells us a portable runner has demand.
 - **Frontend: React + TypeScript** SPA, instructor + student views.
 - **Storage — the split, settled:**
   - **Default: embedded SQLite** (`modernc.org/sqlite`, pure-Go, **no cgo** —
-    preserves cross-compilation). No `QUAD_DATABASE_URL` set → Quad opens/creates a
+    preserves cross-compilation). No `CAIRN_DATABASE_URL` set → Cairn opens/creates a
     local file in WAL mode and is durable out of the box. **One binary + a file**,
     zero external service. This is the headline self-host story and also lets
     contributors run the real store with no setup.
-  - **Scale: Postgres**, activated by `QUAD_DATABASE_URL` — for institutions, hosted
+  - **Scale: Postgres**, activated by `CAIRN_DATABASE_URL` — for institutions, hosted
     multi-tenant, and horizontal/parallel workers.
   - **Tests/CI: in-memory** store, plus an explicit `--ephemeral` flag.
   - Both Postgres and SQLite use `database/sql`, so the SQL layer is shared. The one
@@ -303,13 +304,13 @@ minute limits, which tells us a portable runner has demand.
     realistic class or department (writes are bursty but modest and already bounded
     by host rate limits). Postgres = multiple app/worker instances or large
     multi-tenant.
-  - **No lock-in:** `quad export` / `import` and a direct **SQLite→Postgres migrate**,
+  - **No lock-in:** `cairn export` / `import` and a direct **SQLite→Postgres migrate**,
     so a project that outgrows "solo" moves without pain. Backups are "copy the file"
     (SQLite) or `pg_dump` (Postgres).
 - **Grading runner:** container-based, language-agnostic (§8).
 
 *Why not Postgres-only or compose-default:* `docker compose up` still requires Docker
-on the instructor's machine; a single `./quad` that just works is dramatically lower
+on the instructor's machine; a single `./cairn` that just works is dramatically lower
 friction and strengthens principle §3. The dependency tradeoff (one sizable pure-Go
 module) is worth it; a `-tags nosqlite` build remains for the dependency-averse.
 
@@ -356,11 +357,11 @@ now complete.
 2. **Dashboard as the operator surface** — no curl, no cookies. The forms cover the
    full flow (classroom with host + namespace, assignment with template, roster, a
    grade button); the browser carries the session.
-3. **`quad doctor` + a config file** — replace the env-var block with a config file,
+3. **`cairn doctor` + a config file** — replace the env-var block with a config file,
    and a preflight that checks host reachability, token scopes, and the OAuth
    redirect *before* a runtime 401. (Every failure encountered during bring-up would
    have been caught here.)
-4. **One-command bring-up** — `docker compose up` for Quad + its DB + (optionally)
+4. **One-command bring-up** — `docker compose up` for Cairn + its DB + (optionally)
    Forgejo, with named volumes so data persists across container recreation.
 5. **Operator observability** — provisioning/grading job states and failure reasons
    visible in the dashboard, so nobody greps logs; plus manual **regrade / grade
@@ -381,21 +382,20 @@ score) is validated, including on self-hosted Forgejo. Next, in order: **(a)** d
 default + embedded store; **(b)** `EnsureNamespace` in the provisioning path +
 adapter idempotency; **(c)** the student feedback loop (webhook receiver → results
 view); **(d)** authoring ergonomics (scaffold, prebuilt images, local dry-run);
-**(e)** `quad doctor` + config + compose. OSS hygiene stays maintained throughout
+**(e)** `cairn doctor` + config + compose. OSS hygiene stays maintained throughout
 (`LICENSE`, `README`, `CONTRIBUTING`, code of conduct, issue/PR templates, public
 roadmap) — this is how you compete with a "blessed" alternative on trust.
 
 ## 13. Open decisions (need a call)
 
-1. **Name** — replace the "Quad" placeholder (or keep it). *(The only original
-   open decision still open.)*
-2. **Group assignments** — build for v1 vs fast follow (§3).
-3. **Isolation upgrade timing** — when (and whether) to make gVisor/Kata the default
+1. **Group assignments** — build for v1 vs fast follow (§3).
+2. **Isolation upgrade timing** — when (and whether) to make gVisor/Kata the default
    runtime vs documented swap (§8), based on threat model for shared/hosted
    deployments.
-4. *(Resolved, for the record)* tech stack → Go + React/TS; storage → SQLite-default
+3. *(Resolved, for the record)* tech stack → Go + React/TS; storage → SQLite-default
    + Postgres-scale; license → AGPL server + Apache primitives; hosting → self-host
-   first; activity detection → webhooks + poll fallback in the adapter.
+   first; activity detection → webhooks + poll fallback in the adapter; **name →
+   Cairn**, replacing the "Quad" working name (2026-08).
 
 ---
 
@@ -407,7 +407,7 @@ roadmap) — this is how you compete with a "blessed" alternative on trust.
   black box and the pedagogical loop is broken.)*
 - **Client-side name↔username map** in the dashboard — makes the privacy model usable
   rather than a tax (§6).
-- **Assignment-authoring ergonomics** — `quad new-assignment` scaffold, prebuilt
+- **Assignment-authoring ergonomics** — `cairn new-assignment` scaffold, prebuilt
   language grading images + build helper, and a local dry-run before publish.
 
 **Tier 2 — near-term.**

@@ -6,9 +6,9 @@ import (
 	"context"
 	"testing"
 
-	"github.com/quad/quad/internal/store"
-	"github.com/quad/quad/internal/store/memory"
-	"github.com/quad/quad/pkg/adapter"
+	"github.com/EduCloud-Ecosystem/cairn/internal/store"
+	"github.com/EduCloud-Ecosystem/cairn/internal/store/memory"
+	"github.com/EduCloud-Ecosystem/cairn/pkg/adapter"
 )
 
 // fakeAdapter records the calls the worker makes. Unused methods are no-ops.
@@ -95,7 +95,7 @@ func TestWorkerCreateRepo(t *testing.T) {
 	w := &Worker{
 		Store:          st,
 		Adapters:       map[adapter.Host]adapter.Adapter{adapter.HostGitHub: fa},
-		WebhookBaseURL: "https://quad.example",
+		WebhookBaseURL: "https://cairn.example",
 	}
 	did, err := w.RunOnce(ctx)
 	if err != nil {
@@ -112,8 +112,8 @@ func TestWorkerCreateRepo(t *testing.T) {
 		t.Fatalf("collaborator = %q role = %q, want bob/write", fa.collaborator, fa.role)
 	}
 	// The webhook URL is per-host: <base>/webhooks/<host>.
-	if fa.webhookURL != "https://quad.example/webhooks/github" {
-		t.Fatalf("webhookURL = %q, want https://quad.example/webhooks/github", fa.webhookURL)
+	if fa.webhookURL != "https://cairn.example/webhooks/github" {
+		t.Fatalf("webhookURL = %q, want https://cairn.example/webhooks/github", fa.webhookURL)
 	}
 
 	sub, _ := st.GetSubmission(ctx, "s1")
@@ -135,10 +135,10 @@ func TestWorkerWebhookURLPerHost(t *testing.T) {
 		host adapter.Host
 		want string
 	}{
-		{adapter.HostGitHub, "https://quad.example/webhooks/github"},
-		{adapter.HostForgejo, "https://quad.example/webhooks/forgejo"},
-		{adapter.HostGitea, "https://quad.example/webhooks/gitea"},
-		{adapter.HostGitLab, "https://quad.example/webhooks/gitlab"},
+		{adapter.HostGitHub, "https://cairn.example/webhooks/github"},
+		{adapter.HostForgejo, "https://cairn.example/webhooks/forgejo"},
+		{adapter.HostGitea, "https://cairn.example/webhooks/gitea"},
+		{adapter.HostGitLab, "https://cairn.example/webhooks/gitlab"},
 	}
 	for _, tc := range cases {
 		t.Run(string(tc.host), func(t *testing.T) {
@@ -154,7 +154,7 @@ func TestWorkerWebhookURLPerHost(t *testing.T) {
 
 			fa := &fakeAdapter{}
 			// Trailing slash on the base also exercises the TrimRight.
-			w := &Worker{Store: st, Adapters: map[adapter.Host]adapter.Adapter{tc.host: fa}, WebhookBaseURL: "https://quad.example/"}
+			w := &Worker{Store: st, Adapters: map[adapter.Host]adapter.Adapter{tc.host: fa}, WebhookBaseURL: "https://cairn.example/"}
 			if _, err := w.RunOnce(ctx); err != nil {
 				t.Fatalf("RunOnce: %v", err)
 			}

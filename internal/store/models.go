@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-// Package store contains Quad's domain models and the persistence that backs them.
+// Package store contains Cairn's domain models and the persistence that backs them.
 //
 // PRIVACY: the models below deliberately omit student legal names, SIS IDs, and
 // plaintext student emails. The control plane's identity anchor for a student is
@@ -10,7 +10,7 @@ package store
 import (
 	"time"
 
-	"github.com/quad/quad/pkg/adapter"
+	"github.com/EduCloud-Ecosystem/cairn/pkg/adapter"
 )
 
 const (

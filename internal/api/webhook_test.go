@@ -13,10 +13,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/quad/quad/internal/provisioning"
-	"github.com/quad/quad/internal/store"
-	"github.com/quad/quad/internal/store/memory"
-	"github.com/quad/quad/pkg/adapter"
+	"github.com/EduCloud-Ecosystem/cairn/internal/provisioning"
+	"github.com/EduCloud-Ecosystem/cairn/internal/store"
+	"github.com/EduCloud-Ecosystem/cairn/internal/store/memory"
+	"github.com/EduCloud-Ecosystem/cairn/pkg/adapter"
 )
 
 const testWebhookSecret = "s3cr3t"

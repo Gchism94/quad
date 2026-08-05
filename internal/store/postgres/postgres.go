@@ -21,6 +21,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -40,27 +41,58 @@ func New(db *sql.DB) *Store { return &Store{db: db} }
 // compile-time guarantee that every interface method is implemented.
 var _ store.Store = (*Store)(nil)
 
-// Migrate applies the embedded schema. The bundled migration uses
-// CREATE ... IF NOT EXISTS, so it is safe to run on every startup. Statements
+// Migrate applies every embedded *.up.sql migration, in filename order, inside
+// one transaction. Every migration uses CREATE ... IF NOT EXISTS or
+// ADD COLUMN IF NOT EXISTS, so re-applying the whole set is safe on every
+// startup — there is no schema_migrations tracking table, and none is needed
+// as long as that idempotency convention holds (see migrations.go). Statements
 // are executed individually (the database/sql extended protocol does not allow
 // multiple statements per Exec); the schema contains no procedural bodies or
 // semicolons inside literals, so a simple split is sufficient.
 func (s *Store) Migrate(ctx context.Context) error {
-	raw, err := migrations.FS.ReadFile("0001_init.up.sql")
+	files, err := migrationFiles()
 	if err != nil {
-		return fmt.Errorf("read migration: %w", err)
+		return err
 	}
+
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
 	defer func() { _ = tx.Rollback() }()
-	for _, stmt := range splitStatements(string(raw)) {
-		if _, err := tx.ExecContext(ctx, stmt); err != nil {
-			return fmt.Errorf("apply statement: %w", err)
+	for _, name := range files {
+		raw, err := migrations.FS.ReadFile(name)
+		if err != nil {
+			return fmt.Errorf("read %s: %w", name, err)
+		}
+		for _, stmt := range splitStatements(string(raw)) {
+			if _, err := tx.ExecContext(ctx, stmt); err != nil {
+				return fmt.Errorf("apply %s: %w", name, err)
+			}
 		}
 	}
 	return tx.Commit()
+}
+
+// migrationFiles lists every embedded *.up.sql migration in filename order.
+// Extracted from Migrate so the ordering — the property the whole no-tracking-
+// table design depends on — is unit-testable without a database.
+func migrationFiles() ([]string, error) {
+	entries, err := migrations.FS.ReadDir(".")
+	if err != nil {
+		return nil, fmt.Errorf("read migrations: %w", err)
+	}
+	var files []string
+	for _, e := range entries {
+		if !e.IsDir() && strings.HasSuffix(e.Name(), ".up.sql") {
+			files = append(files, e.Name())
+		}
+	}
+	// embed.FS.ReadDir already returns entries sorted by name; sort explicitly
+	// anyway so the ordering guarantee belongs to this function, not to an
+	// embed.FS implementation detail a future Go version could change.
+	sort.Strings(files)
+	return files, nil
 }
 
 // splitStatements drops full-line SQL comments and blank lines, then splits the

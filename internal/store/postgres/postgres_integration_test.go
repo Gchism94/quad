@@ -48,6 +48,51 @@ func testStore(t *testing.T) *Store {
 	return s
 }
 
+// TestMigrateAppliesAllMigrations is the live-database half of the CC-P5
+// regression guard: Migrate used to apply only 0001_init.up.sql, silently
+// skipping 0002-0004. TestMigrationFilesAreOrderedAndComplete (no database)
+// pins the file list; this asserts the schema those files produce actually
+// exists after Migrate runs.
+func TestMigrateAppliesAllMigrations(t *testing.T) {
+	s := testStore(t)
+	ctx := context.Background()
+	db := s.db
+
+	var col, dtype, isNullable, colDefault string
+	row := db.QueryRowContext(ctx, `
+		SELECT column_name, data_type, is_nullable, column_default
+		FROM information_schema.columns
+		WHERE table_name = 'submissions' AND column_name = 'last_error'`)
+	if err := row.Scan(&col, &dtype, &isNullable, &colDefault); err != nil {
+		t.Fatalf("submissions.last_error (0002): %v", err)
+	}
+	if dtype != "text" || isNullable != "NO" || colDefault != "''::text" {
+		t.Fatalf("submissions.last_error = type=%s nullable=%s default=%s, want text/NO/''::text",
+			dtype, isNullable, colDefault)
+	}
+
+	row = db.QueryRowContext(ctx, `
+		SELECT column_name, data_type, is_nullable, column_default
+		FROM information_schema.columns
+		WHERE table_name = 'classrooms' AND column_name = 'join_policy'`)
+	if err := row.Scan(&col, &dtype, &isNullable, &colDefault); err != nil {
+		t.Fatalf("classrooms.join_policy (0003): %v", err)
+	}
+	if dtype != "text" || isNullable != "NO" || colDefault != "'open'::text" {
+		t.Fatalf("classrooms.join_policy = type=%s nullable=%s default=%s, want text/NO/'open'::text",
+			dtype, isNullable, colDefault)
+	}
+
+	for _, idx := range []string{"idx_roster_host_username", "idx_submissions_repo"} {
+		var name string
+		if err := db.QueryRowContext(ctx,
+			`SELECT indexname FROM pg_indexes WHERE indexname = $1`, idx,
+		).Scan(&name); err != nil {
+			t.Fatalf("index %s (0004): %v", idx, err)
+		}
+	}
+}
+
 func TestPostgresRoundTrip(t *testing.T) {
 	s := testStore(t)
 	ctx := context.Background()

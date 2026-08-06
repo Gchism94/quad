@@ -163,6 +163,18 @@ func (a *Adapter) do(ctx context.Context, method, path string, in, out any, ok .
 	return &apiError{Status: resp.StatusCode, Body: string(raw)}
 }
 
+// --- diagnostics ----------------------------------------------------------
+
+// Probe verifies the configured token without changing anything by reading the
+// account it belongs to. Read-only, as adapter.Prober requires — note that
+// EnsureNamespace is NOT a safe substitute here, since it creates the org.
+func (a *Adapter) Probe(ctx context.Context) error {
+	return a.do(ctx, http.MethodGet, "/user", nil, nil, http.StatusOK)
+}
+
+// Compile-time check that the optional diagnostic interface stays satisfied.
+var _ adapter.Prober = (*Adapter)(nil)
+
 // --- adapter.Adapter methods ----------------------------------------------
 
 // EnsureNamespace makes sure the Forgejo/Gitea organisation exists, creating

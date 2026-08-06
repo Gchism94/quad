@@ -1,0 +1,22 @@
+# Keep the build context small and free of local state or secrets.
+.git
+.github
+.DS_Store
+
+# local runtime state and credentials — must never enter an image
+.env
+cairn.env
+*.db
+ghc-snapshot-*/
+
+# build outputs (the image builds its own)
+/cairn
+/bin
+web/node_modules
+web/dist
+
+# docs and governance add nothing to the build
+*.md
+docs/
+LICENSE
+DCO

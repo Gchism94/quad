@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-// Command cairn runs the Cairn control-plane HTTP server.
+// Command cairn is the Cairn control plane: an HTTP server by default, plus the
+// subcommands in cli.go.
 package main
 
 import (
@@ -95,7 +96,9 @@ func envHostKey(h adapter.Host) string {
 	}
 }
 
-func main() {
+// serve runs the control-plane HTTP server. It is what bare `cairn` and
+// `cairn serve` do.
+func serve() {
 	cfg := config.Load()
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -254,8 +257,10 @@ func splitCSV(s string) []string {
 //	CAIRN_GRADER=local-exec-unsafe host exec runner — NO isolation; trusted use only
 //
 // Container options: CAIRN_GRADER_RUNTIME (docker|podman), CAIRN_GRADER_IMAGE
-// (default image), CAIRN_GRADER_NETWORK (none|restricted),
-// CAIRN_GRADER_RESTRICTED_NETWORK (runtime network name), CAIRN_GRADER_USER.
+// (default image), CAIRN_GRADER_RESTRICTED_NETWORK (the runtime network attached
+// when a spec asks for "restricted"), CAIRN_GRADER_USER. Egress policy itself is
+// per-spec (gradingspec Limits.Network) and fails safe to none.
+
 // schemeHostFromURL extracts the scheme (e.g. "http") and host (e.g.
 // "localhost:3000") from a base URL. Returns ("", "") when raw is empty or
 // unparseable. The clone path uses both so a plain-http instance is not forced

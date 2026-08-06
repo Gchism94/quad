@@ -112,6 +112,17 @@ type CheckResult struct {
 // support. Callers should treat it as a soft failure where reasonable.
 var ErrNotImplemented = errors.New("adapter: not implemented")
 
+// Prober is an OPTIONAL interface an adapter may implement so that operators can
+// verify credentials without provisioning anything. It is deliberately separate
+// from Adapter: it is a diagnostic, not part of the provisioning contract, and an
+// adapter that does not implement it is simply reported as unverified.
+//
+// Probe MUST be read-only — it exists to answer "does this host accept these
+// credentials?" and must never create, modify, or delete anything.
+type Prober interface {
+	Probe(ctx context.Context) error
+}
+
 // Adapter is the contract every Git-host integration implements. v1 ships a
 // GitHub adapter; GitLab and Forgejo/Gitea are additive implementations of this
 // same interface.

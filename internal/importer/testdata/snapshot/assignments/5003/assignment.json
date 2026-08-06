@@ -1,0 +1,21 @@
+{
+  "id": 5003,
+  "title": "Exploratory Data Analysis",
+  "slug": "hw-02",
+  "type": "individual",
+  "editor": "codespaces",
+  "deadline": "2099-01-01T00:00:00Z",
+  "accepted": 3,
+  "submissions": 0,
+  "passing": 0,
+  "max_teams": null,
+  "max_members": null,
+  "public_repo": false,
+  "starter_code_repository": null,
+  "classroom": {
+    "id": 4242,
+    "name": "CS-101-F26-classroom",
+    "archived": false,
+    "url": "https://classroom.github.com/classrooms/9001-cs-101-f26-classroom"
+  }
+}

@@ -50,17 +50,21 @@ config change, not a rewrite — see [`docs/migrating-github-to-forgejo.md`](doc
 ## Layout
 
 ```
-cmd/cairn/           control-plane entrypoint
+cmd/cairn/           control-plane entrypoint + `cairn import ghc`
 internal/            AGPL-3.0 server internals
   api/               HTTP server + routes
   store/             domain models + SQL migrations  (privacy-critical schema)
   provisioning/      durable, idempotent, rate-limited job queue
+  importer/          host-agnostic course import (GitHub Classroom migration)
   config/            runtime config
 pkg/                 Apache-2.0 reusable primitives
   adapter/           THE host-adapter interface + the GitHub adapter
   gradingspec/       the portable grading-spec schema
 web/                 React/TS instructor dashboard (Vite) — see web/README.md
-docs/                operator guides (forgejo-setup.md, …)
+compose.yaml         `docker compose up -d` entry point (includes deploy/)
+Dockerfile           server + dashboard in one image
+deploy/              docker-compose.yml (the stack), Caddyfile, dev-only Postgres
+docs/                operator guides (deploy.md, forgejo-setup.md, …)
 .env.example         all CAIRN_* environment variables, commented
 DESIGN.md            the design doc / rationale
 ROADMAP.md           phased plan
@@ -87,8 +91,54 @@ From here, pick a host to back real classrooms:
   [`docs/forgejo-setup.md`](docs/forgejo-setup.md)
 - **GitLab** — gitlab.com or self-hosted:
   [`docs/gitlab-setup.md`](docs/gitlab-setup.md)
+- **Coming from GitHub Classroom** — import an existing course before the
+  August 28, 2026 shutdown:
+  [`docs/ghc-import.md`](docs/ghc-import.md)
 - **Moving GitHub → self-hosted** later, without rebuilding materials:
   [`docs/migrating-github-to-forgejo.md`](docs/migrating-github-to-forgejo.md)
+
+### Importing from GitHub Classroom
+
+Classroom shuts down August 28, 2026 and its data is deleted September 4;
+organizations and repositories are unaffected. `cairn import ghc` copies the
+perishable metadata into Cairn and points at the repos where they already are —
+it never writes to GitHub.
+
+```sh
+export CAIRN_GHC_TOKEN="$(gh auth token)"   # a user token; the App token can't read Classroom
+cairn import ghc --list
+cairn import ghc --classroom <id> --dry-run --snapshot ./ghc-<id>   # full plan, writes nothing
+cairn import ghc --classroom <id> --snapshot ./ghc-<id>             # idempotent
+```
+
+Every live run captures a snapshot, which still imports after the API is gone
+(`--from ./ghc-<id>`). Take one for every course you may want, before August 28.
+Details and the verified export surface: [`docs/ghc-import.md`](docs/ghc-import.md).
+
+## Deploying for real
+
+Server, dashboard, and PostgreSQL come up together:
+
+```sh
+cp .env.example .env      # set POSTGRES_PASSWORD, DOCKER_GID, CAIRN_ADMIN_USERS
+docker compose up -d
+docker compose exec cairn cairn doctor
+```
+
+Add automatic HTTPS with `docker compose --profile tls up -d` once a domain
+points at the host. Full walkthrough: [`docs/deploy.md`](docs/deploy.md).
+
+### `cairn doctor`
+
+Checks the store (and tells unmigrated apart from unreachable), unrecognized or
+silently-ignored `CAIRN_*` variables, the listen address, host credentials,
+webhook configuration, operator auth, the dashboard build, the container runtime,
+and — the one that is otherwise near-undiagnosable — whether a grading container
+can actually see the directory Cairn writes checkouts into. Every failure prints
+what to change; exit status is 1 if any check fails.
+
+Add `--verify-hosts` to make one read-only API call per configured Git host and
+prove the credentials are accepted rather than merely present.
 
 ## Build
 

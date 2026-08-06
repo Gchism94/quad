@@ -1,0 +1,11 @@
+# Entry point for `docker compose up -d` from the repository root.
+#
+# The deployment itself is defined in deploy/docker-compose.yml; this file only
+# makes the repository root the Compose project directory. That matters: Compose
+# reads .env for ${VARIABLE} interpolation from the project directory, so without
+# this indirection every command would need `--env-file .env` — and would fail
+# with a confusing "variable is not set" if you forgot it.
+#
+# See docs/deploy.md.
+include:
+  - deploy/docker-compose.yml

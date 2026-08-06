@@ -9,5 +9,8 @@ dist/
 cairn.env
 cairn.db
 *.db
+
+# captured GitHub Classroom snapshots: real student usernames and repo names
+ghc-snapshot-*/
 .DS_Store
 _git_locks_to_delete/

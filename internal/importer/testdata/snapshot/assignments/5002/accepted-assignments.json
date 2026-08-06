@@ -1,0 +1,51 @@
+[
+  {
+    "id": 70011,
+    "submitted": true,
+    "passing": true,
+    "commit_count": 21,
+    "students": [
+      {
+        "id": 1002,
+        "login": "student02",
+        "html_url": "https://github.com/student02"
+      },
+      {
+        "id": 1001,
+        "login": "student01",
+        "html_url": "https://github.com/student01"
+      }
+    ],
+    "repository": {
+      "id": 211,
+      "name": "final-project-team-alpha",
+      "full_name": "CS-101-F26/final-project-team-alpha",
+      "html_url": "https://github.com/CS-101-F26/final-project-team-alpha",
+      "private": false,
+      "default_branch": "main"
+    },
+    "grade": null
+  },
+  {
+    "id": 70012,
+    "submitted": true,
+    "passing": true,
+    "commit_count": 7,
+    "students": [
+      {
+        "id": 1003,
+        "login": "student03",
+        "html_url": "https://github.com/student03"
+      }
+    ],
+    "repository": {
+      "id": 212,
+      "name": "final-project-student03-solo",
+      "full_name": "CS-101-F26/final-project-student03-solo",
+      "html_url": "https://github.com/CS-101-F26/final-project-student03-solo",
+      "private": false,
+      "default_branch": "main"
+    },
+    "grade": "80/100"
+  }
+]

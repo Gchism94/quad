@@ -29,6 +29,39 @@ Open Claude Code in the repo and paste the session prompt. Start in plan mode.
    Sept 4, but repos in the org remain as ordinary repos — verify). Record
    findings in docs/ghc-import.md before coding.
 
+   Desk research done 2026-08-05 (Cowork), to start the investigation from,
+   not to replace it — none of this was checked against the maintainer's
+   actual classroom:
+   - The working hypothesis is confirmed by GitHub's own retirement notice:
+     classroom-specific data (classroom/assignment names, tests defined
+     outside repos, historical test-run data, submissions, LTI-integrated
+     rosters) is permanently deleted, final deletion September 4, 2026;
+     accounts, repositories, and organizations are explicitly stated as
+     unaffected and persist indefinitely.
+   - GitHub publishes an official export tool,
+     `github-education-resources/classroom-export-utility`
+     (`export-classrooms.sh`, `gh auth login` + the `gh classroom` CLI
+     extension + `jq`), producing a directory tree per classroom:
+     `classrooms.json`, per-classroom `assignments.json`, and per-assignment
+     `assignment.json` + `accepted-assignments.json` + `grades.csv`. The
+     accepted-assignments/grades files already carry GitHub username, roster
+     identifier, **repository URL**, submission timestamp, and grade
+     together — if accurate, this removes the need to infer the
+     assignment-prefix repo-naming convention by pattern-matching the org,
+     since the repo URL is already in the data.
+   - Caveat, not to be skipped: this tool shows minimal maintenance history
+     (a handful of commits, a couple of open issues) and is not the same
+     thing as a first-party, load-bearing GitHub API. Verify its output
+     against the real org before trusting it as the importer's primary input
+     format — confirm the JSON schema actually matches what's described here,
+     and confirm it runs cleanly end to end, before building `cairn import
+     ghc` against it. If it's unreliable, fall back to the original plan
+     (roster CSV + repo-naming convention inference).
+   - Sources: [GitHub Classroom retirement FAQ](https://github.com/orgs/community/discussions/145312),
+     [Classroom sign-ups no longer available](https://github.blog/changelog/2026-05-26-github-classroom-sign-ups-are-no-longer-available/),
+     [Export or migrate GitHub Classroom data](https://docs.github.com/en/education/manage-coursework-with-github-classroom/get-started-with-github-classroom/export-or-migrate-github-classroom-data),
+     [classroom-export-utility](https://github.com/github-education-resources/classroom-export-utility).
+
 5. UPDATE ROADMAP.md CHECKBOXES as part of every session's definition of
    done. The file drifted from the commits once already.
 

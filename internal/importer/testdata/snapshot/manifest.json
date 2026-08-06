@@ -1,0 +1,14 @@
+{
+  "format": 1,
+  "source": "github-classroom",
+  "api_base": "https://api.github.com",
+  "classroom_id": 4242,
+  "classroom_name": "CS-101-F26-classroom",
+  "organization": "CS-101-F26",
+  "captured_at": "2026-08-05T12:00:00Z",
+  "assignment_ids": [
+    5001,
+    5002,
+    5003
+  ]
+}

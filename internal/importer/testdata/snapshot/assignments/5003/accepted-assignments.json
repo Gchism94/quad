@@ -1,0 +1,62 @@
+[
+  {
+    "id": 70021,
+    "submitted": false,
+    "passing": false,
+    "commit_count": 0,
+    "students": [
+      {
+        "id": 1001,
+        "login": "student01",
+        "html_url": "https://github.com/student01"
+      }
+    ],
+    "repository": {
+      "id": 221,
+      "name": "hw-02-student01",
+      "full_name": "CS-101-F26/hw-02-student01",
+      "html_url": "https://github.com/CS-101-F26/hw-02-student01",
+      "private": true,
+      "default_branch": "main"
+    },
+    "grade": null
+  },
+  {
+    "id": 70022,
+    "submitted": false,
+    "passing": false,
+    "commit_count": 0,
+    "students": [
+      {
+        "id": 1002,
+        "login": "student02",
+        "html_url": "https://github.com/student02"
+      }
+    ],
+    "repository": {
+      "id": 222,
+      "name": "hw-02-student02",
+      "full_name": "CS-101-F26/hw-02-student02",
+      "html_url": "https://github.com/CS-101-F26/hw-02-student02",
+      "private": true,
+      "default_branch": "main"
+    },
+    "grade": "n/a"
+  },
+  {
+    "id": 70023,
+    "submitted": false,
+    "passing": false,
+    "commit_count": 0,
+    "students": [],
+    "repository": {
+      "id": 223,
+      "name": "hw-02-orphaned",
+      "full_name": "CS-101-F26/hw-02-orphaned",
+      "html_url": "https://github.com/CS-101-F26/hw-02-orphaned",
+      "private": true,
+      "default_branch": "main"
+    },
+    "grade": null
+  }
+]

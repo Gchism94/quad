@@ -4,9 +4,12 @@
 
 // Integration tests for the PostgreSQL store. They are compiled only with
 // -tags postgres and skip unless CAIRN_TEST_DATABASE_URL points at a database
-// you don't mind being TRUNCATEd. Run locally with:
+// you don't mind being TRUNCATEd. The tag gates these tests only — the shipped
+// binary always includes the Postgres driver and selects a store at runtime.
 //
-//	CAIRN_TEST_DATABASE_URL=postgres://cairn:cairn@localhost:5432/cairn?sslmode=disable \
+// Run locally against deploy/docker-compose.dev.yml, which publishes 5433:
+//
+//	CAIRN_TEST_DATABASE_URL=postgres://cairn:cairn@localhost:5433/cairn?sslmode=disable \
 //	  go test -tags postgres ./internal/store/postgres
 package postgres
 

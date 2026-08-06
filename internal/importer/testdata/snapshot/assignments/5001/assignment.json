@@ -1,0 +1,28 @@
+{
+  "id": 5001,
+  "title": "Python Foundations",
+  "slug": "hw-01",
+  "type": "individual",
+  "editor": "codespaces",
+  "deadline": "2026-02-07T01:00:00Z",
+  "accepted": 3,
+  "submissions": 3,
+  "passing": 2,
+  "max_teams": null,
+  "max_members": null,
+  "public_repo": false,
+  "starter_code_repository": {
+    "id": 111,
+    "name": "cs-101-f26-classroom-python-foundations-hw-01",
+    "full_name": "CS-101-F26/cs-101-f26-classroom-python-foundations-hw-01",
+    "html_url": "https://github.com/CS-101-F26/cs-101-f26-classroom-python-foundations-hw-01",
+    "private": true,
+    "default_branch": "main"
+  },
+  "classroom": {
+    "id": 4242,
+    "name": "CS-101-F26-classroom",
+    "archived": false,
+    "url": "https://classroom.github.com/classrooms/9001-cs-101-f26-classroom"
+  }
+}

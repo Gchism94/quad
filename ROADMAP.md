@@ -17,7 +17,7 @@ their final shape:
 - [x] Autograding + score capture (pluggable Runner + Checkout; persists GradingRun & Grade). Sandboxed **container runner** enforces gradingspec.Limits (network/memory/cpu/pids, dropped caps, read-only rootfs); host-exec runner remains as an explicit unsafe/local option
 - [x] CSV export of scores keyed by username
 - [x] Web dashboard — instructor console (React/TS + Vite in web/); student-facing views are follow-up
-- [x] Durable persistence — PostgreSQL store (`internal/store/postgres`, database/sql) behind `-tags postgres`; in-memory remains the default build
+- [x] Durable persistence — PostgreSQL store (`internal/store/postgres`, database/sql), selected by `CAIRN_DATABASE_URL` / `CAIRN_STORE=postgres`; SQLite is the zero-config default and in-memory is available for tests. (No build tag: the pgx driver is always compiled in.)
 - [x] Operator authentication — host OAuth + username allowlist, cookie sessions, `created_by` attribution; opt-in via `CAIRN_ADMIN_USERS` (open mode otherwise, with a warning)
 
 ## Phase 2 — Host-agnostic *(the differentiator)*
@@ -30,9 +30,23 @@ their final shape:
 ## Pilot sprint — July–August 2026 (the 1.0-beta gap; see KICKOFF-PROMPT.md)
 Deadline context: pilot-ready before the August 28 shutdown; the pilot course
 integrates for the full semester from the first assignment.
-- [ ] GitHub Classroom import (`cairn import ghc`) — the migration path
-- [ ] `cairn doctor` self-diagnostics
-- [ ] One-command deploy verified on a clean VM (docs/deploy.md)
+- [x] GitHub Classroom import (`cairn import ghc`) — the migration path. Reads the
+  Classroom REST API directly (no export script), captures a snapshot that outlives
+  the September 4 deletion, and binds Cairn to the existing org repos without
+  touching GitHub. Export surface verified against a real classroom first; findings
+  and the rejected `/grades` endpoint are documented in `docs/ghc-import.md`
+- [x] `cairn doctor` self-diagnostics — store reachability (distinguishing
+  unmigrated from unreachable), unrecognized/ignored `CAIRN_*` variables, listen
+  address, host credentials (`--verify-hosts` proves them against the host),
+  webhook config, operator auth, dashboard, container runtime, and a real
+  round-trip proving grading can see its work directory. Every failure prints the
+  fix; exit status 1 on failure
+- [x] One-command deploy verified on a clean VM (docs/deploy.md) — `Dockerfile` +
+  root `compose.yaml` + `deploy/docker-compose.yml` (cairn + PostgreSQL, Caddy
+  under `--profile tls`). Verified end to end on a bare Ubuntu 24.04 droplet
+  2026-08-06: Docker install → build → `docker compose up -d` (2m06s) → `cairn
+  doctor` green → classroom created in the dashboard; grading's socket + shared
+  work directory confirmed on native Linux; survives reboot with data intact
 - [ ] Student-facing views completed
 - [ ] docs/migrate-from-github-classroom.md — the afternoon migration guide
 

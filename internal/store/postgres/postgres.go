@@ -3,10 +3,10 @@
 // Package postgres implements store.Store on top of database/sql.
 //
 // It imports NO SQL driver: the caller opens a *sql.DB with whatever driver they
-// prefer (the cmd wires github.com/jackc/pgx/v5/stdlib behind the `postgres`
-// build tag) and passes it to New. That keeps this package — and the default
-// build of the whole module — free of external dependencies, while the
-// production database layer is real and driver-backed.
+// prefer (cmd/cairn wires github.com/jackc/pgx/v5/stdlib) and passes it to New.
+// That keeps this package itself free of driver dependencies while the production
+// database layer is real and driver-backed. The store in use is selected at
+// runtime, not at build time — see cmd/cairn/store_open.go.
 //
 // Queries use PostgreSQL positional placeholders ($1, $2, …) and PostgreSQL
 // features (ON CONFLICT, FOR UPDATE SKIP LOCKED, JSONB), so a PostgreSQL-family

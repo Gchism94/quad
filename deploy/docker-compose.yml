@@ -1,25 +1,96 @@
-# PostgreSQL for local Cairn development.
+# Cairn: the whole control plane in one command.
 #
+#   cp .env.example .env && $EDITOR .env
 #   docker compose -f deploy/docker-compose.yml up -d
+#   docker compose -f deploy/docker-compose.yml exec cairn cairn doctor
 #
-# Then point the server at it:
-#   export CAIRN_DATABASE_URL=postgres://cairn:cairn@localhost:5432/cairn?sslmode=disable
-#   CAIRN_DB_AUTOMIGRATE=1 go run -tags postgres ./cmd/cairn
+# Add automatic HTTPS with --profile tls (needs a domain pointed at this host).
+# For a local Postgres to develop against WITHOUT running Cairn in a container,
+# use docker-compose.dev.yml instead.
+#
+# Full walkthrough, including the DOCKER_GID and work-directory steps that are
+# easy to get wrong: docs/deploy.md
+name: cairn
+
 services:
   postgres:
     image: postgres:16
+    restart: unless-stopped
     environment:
       POSTGRES_USER: cairn
-      POSTGRES_PASSWORD: cairn
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
       POSTGRES_DB: cairn
-    ports:
-      - "5433:5432"
     volumes:
       - cairn_pgdata:/var/lib/postgresql/data
+    # Not published to the host: only the cairn service needs to reach it.
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U cairn"]
       interval: 5s
       timeout: 3s
       retries: 10
+
+  cairn:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    image: cairn:local
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    init: true
+    # Everything an operator configures lives in .env at the repository root.
+    env_file:
+      - ../.env
+    # These are owned by the deployment, so they override anything in .env:
+    # the database is this compose's Postgres, the dashboard ships in the image,
+    # and TMPDIR must match the bind mount below.
+    environment:
+      CAIRN_DATABASE_URL: postgres://cairn:${POSTGRES_PASSWORD}@postgres:5432/cairn?sslmode=disable
+      CAIRN_DB_AUTOMIGRATE: "1"
+      CAIRN_WEB_DIR: /srv/cairn/web
+      CAIRN_LISTEN_ADDR: ":8080"
+      TMPDIR: ${CAIRN_WORK_DIR:-/var/lib/cairn/work}
+    # Grading runs each spec in a sandboxed container on the host's runtime.
+    # group_add gives this container permission to use the socket without running
+    # as root; DOCKER_GID must be the host's docker group id:
+    #   getent group docker | cut -d: -f3
+    group_add:
+      - "${DOCKER_GID:-999}"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      # The SAME path on both sides, deliberately. The Docker daemon resolves
+      # every -v path on the HOST, so a checkout directory that exists only
+      # inside this container would be mounted empty into the grading container
+      # and every run would fail. `cairn doctor` verifies this round trip.
+      - ${CAIRN_WORK_DIR:-/var/lib/cairn/work}:${CAIRN_WORK_DIR:-/var/lib/cairn/work}
+    ports:
+      # Bind to 127.0.0.1 when fronting this with the tls profile.
+      - "${CAIRN_HTTP_BIND:-0.0.0.0}:${CAIRN_HTTP_PORT:-8080}:8080"
+
+  caddy:
+    profiles: ["tls"]
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - cairn
+    environment:
+      # Not marked required: Compose interpolates every service regardless of
+      # profile, so a `:?` here would break the base stack for everyone not
+      # using TLS. Instead, an unset domain becomes a self-describing hostname,
+      # so Caddy's error names the problem. The default has to be applied here
+      # rather than in the Caddyfile: Compose sets the variable to an empty
+      # string, and Caddy's own {$VAR:default} only fires when it is UNSET.
+      CAIRN_DOMAIN: ${CAIRN_DOMAIN:-cairn-domain-not-set.invalid}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    ports:
+      - "80:80"
+      - "443:443"
+
 volumes:
   cairn_pgdata:
+  caddy_data:
+  caddy_config:

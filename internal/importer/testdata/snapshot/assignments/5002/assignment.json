@@ -1,0 +1,28 @@
+{
+  "id": 5002,
+  "title": "Final Project",
+  "slug": "final-project",
+  "type": "group",
+  "editor": "codespaces",
+  "deadline": null,
+  "accepted": 2,
+  "submissions": 1,
+  "passing": 1,
+  "max_teams": null,
+  "max_members": 2,
+  "public_repo": false,
+  "starter_code_repository": {
+    "id": 112,
+    "name": "cs-101-f26-classroom-final-project",
+    "full_name": "CS-101-F26/cs-101-f26-classroom-final-project",
+    "html_url": "https://github.com/CS-101-F26/cs-101-f26-classroom-final-project",
+    "private": true,
+    "default_branch": "main"
+  },
+  "classroom": {
+    "id": 4242,
+    "name": "CS-101-F26-classroom",
+    "archived": false,
+    "url": "https://classroom.github.com/classrooms/9001-cs-101-f26-classroom"
+  }
+}

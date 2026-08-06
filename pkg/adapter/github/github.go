@@ -256,6 +256,19 @@ func (a *Adapter) do(ctx context.Context, method, path string, in, out any, ok .
 	return &apiError{Status: resp.StatusCode, Body: string(raw)}
 }
 
+// --- diagnostics ----------------------------------------------------------
+
+// Probe verifies the App credentials without changing anything: it lists the
+// installation's repositories with the smallest possible page, which forces the
+// transport to mint an installation token and proves the App ID, installation ID,
+// and private key all agree. Read-only, as adapter.Prober requires.
+func (a *Adapter) Probe(ctx context.Context) error {
+	return a.do(ctx, http.MethodGet, "/installation/repositories?per_page=1", nil, nil, http.StatusOK)
+}
+
+// Compile-time check that the optional diagnostic interface stays satisfied.
+var _ adapter.Prober = (*Adapter)(nil)
+
 // --- adapter.Adapter methods ----------------------------------------------
 
 func (a *Adapter) EnsureNamespace(ctx context.Context, slug string) (adapter.NamespaceRef, error) {

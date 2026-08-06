@@ -1,0 +1,29 @@
+# Automatic HTTPS in front of Cairn, used by the "tls" compose profile.
+#
+# Caddy obtains and renews a Let's Encrypt certificate for CAIRN_DOMAIN on its
+# own; there is nothing to run by hand. It needs ports 80 and 443 reachable from
+# the internet and DNS already pointing at this host.
+#
+# Set in .env:
+#   CAIRN_DOMAIN=cairn.example.edu
+#   CAIRN_HTTP_BIND=127.0.0.1     # keep the plain-HTTP port off the public interface
+#   CAIRN_WEBHOOK_BASE_URL=https://cairn.example.edu
+#   CAIRN_OAUTH_REDIRECT_URL=https://cairn.example.edu/auth/callback
+#   CAIRN_COOKIE_SECURE=1
+
+# The placeholder below is deliberate. If CAIRN_DOMAIN is unset, an empty site
+# address makes Caddy read this block as global options and fail with
+# "unrecognized global option: encode" — which names neither the cause nor the
+# fix. Substituting an obviously-fake hostname instead means the error says
+# cairn-domain-not-set.invalid, which explains itself.
+{$CAIRN_DOMAIN:cairn-domain-not-set.invalid} {
+	encode zstd gzip
+
+	# Cairn is same-origin: it serves both the API and the dashboard.
+	reverse_proxy cairn:8080 {
+		# Webhook deliveries and grading runs can take a while; do not cut them off.
+		transport http {
+			read_timeout 300s
+		}
+	}
+}

@@ -116,6 +116,24 @@ func checkIsolationTier(ctx context.Context, cfg GradingConfig, runtime string, 
 				"set CAIRN_GRADER_ISOLATION=gvisor to add one (see docs/deploy.md)")
 
 	case IsolationGVisor:
+		// The registered-runtimes question only has a daemon-side answer under
+		// Docker. Podman is daemonless: runtimes are declared per-user in
+		// containers.conf and chosen per-invocation, and `podman info` exposes
+		// only .Host.ociRuntime — the runtime *currently in use* — with no list
+		// of the alternatives available. Verified against podman's own info(1)
+		// documentation, 2026-08-09.
+		//
+		// Running Docker's query against podman therefore returns an empty
+		// string and would report "runsc not registered" for a perfectly working
+		// gVisor setup. Saying "not checked" is the honest result; claiming a
+		// check that did not happen is worse than declining to check.
+		if runtime == "podman" {
+			return warnf(name, podmanGVisorFix(),
+				"CAIRN_GRADER_ISOLATION=gvisor, but this check is not implemented for podman — "+
+					"podman is daemonless and has no registered-runtimes list to query, so gVisor "+
+					"availability was NOT verified here. Confirm it manually")
+		}
+
 		// Ask the daemon what runtimes it has registered. Checking for the runsc
 		// binary on PATH would not be enough: Cairn may run in a container while
 		// the daemon lives on the host, so what matters is what the *daemon* can
@@ -138,6 +156,20 @@ func checkIsolationTier(ctx context.Context, cfg GradingConfig, runtime string, 
 			"set CAIRN_GRADER_ISOLATION to \""+IsolationShared+"\" or \""+IsolationGVisor+"\", or unset it for the default",
 			"unknown CAIRN_GRADER_ISOLATION value %q", cfg.Isolation)
 	}
+}
+
+// podmanGVisorFix tells the operator how to confirm what doctor could not.
+// Podman selects the runtime per invocation, which is exactly how Cairn's
+// grading runner passes it — so a correct setup here really is unverifiable
+// from a daemon query, not merely unimplemented out of laziness.
+func podmanGVisorFix() string {
+	return "verify gVisor manually — podman has no daemon to ask, so confirm both:\n" +
+		"  runsc --version                        # the binary is installed\n" +
+		"  podman run --rm --runtime runsc alpine true   # podman can actually use it\n" +
+		"declare it in containers.conf ([engine] runtimes) if that fails:\n" +
+		"  https://gvisor.dev/docs/user_guide/quick_start/podman/\n" +
+		"grading passes --runtime runsc per container, so a working command above\n" +
+		"means grading will work; this check simply cannot confirm it for you"
 }
 
 func gvisorFix(runtime string) string {

@@ -101,12 +101,40 @@ func (t IsolationTier) resolve() (IsolationTier, error) {
 	}
 }
 
-// ValidateIsolation reports whether the configured tier is a recognised value.
-// Callers that construct a runner from configuration should call this at startup
-// so a typo fails immediately rather than at the first grading run.
+// ValidateIsolation reports whether the configured tier is a recognised value
+// and whether ExtraArgs conflicts with it. Callers that construct a runner from
+// configuration should call this at startup so a misconfiguration fails
+// immediately rather than at the first grading run.
 func (r *ContainerRunner) ValidateIsolation() error {
-	_, err := r.Isolation.resolve()
-	return err
+	if _, err := r.Isolation.resolve(); err != nil {
+		return err
+	}
+	return r.validateExtraArgs()
+}
+
+// validateExtraArgs refuses an ExtraArgs entry that selects the OCI runtime.
+//
+// ExtraArgs is appended after every flag buildRunArgs constructs, and the
+// runtime CLIs take the last occurrence of a repeated flag — so a --runtime
+// there does not merely duplicate the isolation tier's choice, it overrides it.
+// That would let configuration ask for the gVisor tier and silently run under a
+// weaker runtime, which is precisely the failure mode IsolationTier exists to
+// prevent.
+//
+// This refuses unconditionally rather than only on disagreement. "--runtime=runsc
+// alongside Isolation=gvisor" happens to be harmless today, but permitting it
+// makes the runtime a two-source setting, and the next edit to either source
+// silently decides which one wins. One setting, one source.
+func (r *ContainerRunner) validateExtraArgs() error {
+	for _, a := range r.ExtraArgs {
+		if a == "--runtime" || strings.HasPrefix(a, "--runtime=") {
+			return fmt.Errorf(
+				"ExtraArgs may not contain %q: the OCI runtime is selected by the isolation tier "+
+					"(currently %q). Remove it from ExtraArgs and set the tier instead — valid tiers are %q and %q",
+				a, string(r.EffectiveIsolation()), string(IsolationShared), string(IsolationGVisor))
+		}
+	}
+	return nil
 }
 
 // EffectiveIsolation is the tier this runner will actually use, with the empty

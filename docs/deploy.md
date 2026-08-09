@@ -274,6 +274,18 @@ back to a shared-kernel container: `cairn doctor` fails with the fix, and
 grading refuses to run. A deployment that believes it has a kernel boundary and
 does not is worse off than one that never asked for it.
 
+For the same reason, `CAIRN_GRADER_ISOLATION` is the *only* place the OCI
+runtime is chosen. A `--runtime` entry in the runner's advanced `ExtraArgs` is
+rejected at startup rather than merged, because `ExtraArgs` is appended last and
+would otherwise override the tier you configured.
+
+> **On podman:** `cairn doctor` cannot verify gVisor for you. Podman is
+> daemonless — runtimes are declared in `containers.conf` and selected per
+> container — so there is no registered-runtimes list to query, and doctor says
+> so explicitly instead of guessing. Grading still works: it passes
+> `--runtime runsc` per container, which is podman's own mechanism. Confirm it
+> yourself with `podman run --rm --runtime runsc alpine true`.
+
 **The honest performance cost.** CPU-bound work — the common case for
 autograding — runs at roughly native speed. Syscall- and I/O-heavy work runs
 **2–10× slower**, so a grading run that spawns many processes, writes many

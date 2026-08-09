@@ -153,6 +153,70 @@ func TestValidateIsolation(t *testing.T) {
 	}
 }
 
+// ExtraArgs is appended after every constructed flag and the runtime CLIs take
+// the last occurrence, so a --runtime there overrides the isolation tier. It is
+// refused at validation time regardless of tier, and regardless of whether it
+// happens to agree — the rule is "don't allow it", not "don't allow it if it
+// disagrees".
+func TestExtraArgsMayNotSelectTheRuntime(t *testing.T) {
+	tiers := []IsolationTier{"", IsolationShared, IsolationGVisor}
+	smuggled := [][]string{
+		{"--runtime", "runsc"},                  // separate value
+		{"--runtime=runsc"},                     // joined form
+		{"--runtime", "runc"},                   // a weaker runtime: the dangerous case
+		{"--runtime=runc"},                      //
+		{"--memory", "1g", "--runtime", "kata"}, // buried among innocuous args
+	}
+
+	for _, tier := range tiers {
+		for _, extra := range smuggled {
+			r := &ContainerRunner{Isolation: tier, ExtraArgs: extra}
+			err := r.ValidateIsolation()
+			if err == nil {
+				t.Errorf("tier %q with ExtraArgs %q: validation passed; "+
+					"a --runtime in ExtraArgs overrides the tier and must be refused", tier, extra)
+				continue
+			}
+			// The message has to name the offending entry and point at the tier,
+			// or an operator cannot act on it.
+			if !strings.Contains(err.Error(), "ExtraArgs") {
+				t.Errorf("tier %q extra %q: message does not mention ExtraArgs: %v", tier, extra, err)
+			}
+		}
+	}
+}
+
+// Even the coincidentally-agreeing case is refused: gvisor tier + --runtime=runsc
+// would work today, but permitting it makes the runtime a two-source setting.
+func TestExtraArgsRuntimeRefusedEvenWhenItAgrees(t *testing.T) {
+	r := &ContainerRunner{Isolation: IsolationGVisor, ExtraArgs: []string{"--runtime", "runsc"}}
+	if err := r.ValidateIsolation(); err == nil {
+		t.Fatal("a --runtime in ExtraArgs matching the configured tier must still be refused")
+	}
+}
+
+// ExtraArgs that do not touch the runtime remain allowed — this fix must not
+// turn ExtraArgs into a dead field.
+func TestExtraArgsWithoutRuntimeStillValidates(t *testing.T) {
+	allowed := [][]string{
+		nil,
+		{},
+		{"--label", "course=cs101"},
+		{"--dns", "10.0.0.1"},
+		// A value that merely contains the word must not trip the check.
+		{"--label", "note=--runtime-is-not-set-here"},
+		{"--env", "RUNTIME=python"},
+	}
+	for _, extra := range allowed {
+		for _, tier := range []IsolationTier{"", IsolationShared, IsolationGVisor} {
+			r := &ContainerRunner{Isolation: tier, ExtraArgs: extra}
+			if err := r.ValidateIsolation(); err != nil {
+				t.Errorf("tier %q with benign ExtraArgs %q was rejected: %v", tier, extra, err)
+			}
+		}
+	}
+}
+
 func TestEffectiveIsolationResolvesTheDefault(t *testing.T) {
 	if got := (&ContainerRunner{}).EffectiveIsolation(); got != IsolationShared {
 		t.Errorf("unset isolation = %q, want %q", got, IsolationShared)

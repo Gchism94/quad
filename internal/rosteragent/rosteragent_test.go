@@ -197,21 +197,146 @@ func TestMatchTiers(t *testing.T) {
 	}
 }
 
-// An ambiguous name must not be auto-assigned to whichever candidate sorted first.
-func TestMatchAmbiguousIsUnmatched(t *testing.T) {
+// Two students with the same name must not be auto-assigned to whichever
+// candidate sorted first — and the tie has to be *resolvable*, not just
+// detected, so the tied candidates come back with the match.
+func TestMatchSameNameIsAmbiguousAndCarriesCandidates(t *testing.T) {
+	candidates := []Candidate{
+		{Username: "jdoe2", FullName: "Jane Doe"},
+		{Username: "jdoe1", FullName: "Jane Doe"},
+	}
+	got := MatchRoster([]RosterRow{{Name: "Jane Doe"}}, candidates)[0]
+
+	if got.Status != MatchAmbiguous {
+		t.Fatalf("status = %q, want %q so the instructor can resolve it", got.Status, MatchAmbiguous)
+	}
+	if got.Username != "" {
+		t.Errorf("username = %q, want empty until the instructor chooses", got.Username)
+	}
+	if len(got.Candidates) != 2 {
+		t.Fatalf("candidates = %d, want both tied options carried for selection", len(got.Candidates))
+	}
+	// Sorted so the numbered list an instructor sees is stable between runs.
+	if got.Candidates[0].Username != "jdoe1" || got.Candidates[1].Username != "jdoe2" {
+		t.Errorf("candidates not sorted by username: %+v", got.Candidates)
+	}
+	if !strings.Contains(got.Why, "jdoe1") || !strings.Contains(got.Why, "jdoe2") {
+		t.Errorf("why should name the options for the audit log, got %q", got.Why)
+	}
+}
+
+// A reordered name matching several candidates is the other ambiguity path.
+func TestMatchSeveralNearMatchesIsAmbiguous(t *testing.T) {
 	candidates := []Candidate{
 		{Username: "jdoe1", FullName: "Jane Doe"},
 		{Username: "jdoe2", FullName: "Jane Doe"},
 	}
-	// Same-name students: the exact-match rule takes the first, which is a real
-	// hazard — assert at least that a *near* match with two candidates does not
-	// silently pick one.
 	got := MatchRoster([]RosterRow{{Name: "Doe, Jane"}}, candidates)[0]
-	if got.Status != MatchNone {
-		t.Errorf("status = %q, want %q so the instructor resolves it", got.Status, MatchNone)
+	if got.Status != MatchAmbiguous {
+		t.Errorf("status = %q, want %q", got.Status, MatchAmbiguous)
 	}
-	if !strings.Contains(got.Why, "ambiguous") {
-		t.Errorf("why = %q, want it to name the ambiguity", got.Why)
+	if len(got.Candidates) != 2 {
+		t.Errorf("candidates = %d, want 2", len(got.Candidates))
+	}
+}
+
+// Resolve turns a tie into a confirmed match, and refuses anything that was not
+// on the list — a mistyped answer must not enrol an unoffered student.
+func TestResolveAppliesOnlyAListedCandidate(t *testing.T) {
+	candidates := []Candidate{
+		{Username: "jdoe1", FullName: "Jane Doe"},
+		{Username: "jdoe2", FullName: "Jane Doe"},
+	}
+	m := MatchRoster([]RosterRow{{Name: "Jane Doe", Email: "jane@example.edu"}}, candidates)[0]
+
+	if err := m.Resolve("someone-else"); err == nil {
+		t.Error("Resolve accepted a username that was not among the candidates")
+	}
+	if m.Username != "" {
+		t.Errorf("a rejected Resolve must not mutate the match; username = %q", m.Username)
+	}
+
+	if err := m.Resolve("jdoe2"); err != nil {
+		t.Fatalf("Resolve(jdoe2): %v", err)
+	}
+	if m.Username != "jdoe2" {
+		t.Errorf("username = %q, want jdoe2", m.Username)
+	}
+	if m.Status != MatchNeedsConfirm {
+		t.Errorf("status = %q, want %q after resolution", m.Status, MatchNeedsConfirm)
+	}
+	if len(m.Candidates) != 0 {
+		t.Error("resolved match should no longer carry the tied candidates")
+	}
+}
+
+// The chosen candidate must round-trip into the payload — the whole point of
+// resolving rather than skipping.
+func TestResolvedAmbiguityRoundTripsIntoPayload(t *testing.T) {
+	candidates := []Candidate{
+		{Username: "jdoe1", FullName: "Jane Doe"},
+		{Username: "jdoe2", FullName: "Jane Doe"},
+	}
+	for _, pick := range []string{"jdoe1", "jdoe2"} {
+		m := MatchRoster([]RosterRow{{Name: "Jane Doe", Email: "jane@example.edu"}}, candidates)[0]
+		if err := m.Resolve(pick); err != nil {
+			t.Fatal(err)
+		}
+		req, skipped := BuildPayload("c1", []Match{m})
+		if len(skipped) != 0 {
+			t.Errorf("pick %s: resolved match was skipped", pick)
+		}
+		if len(req.Entries) != 1 || req.Entries[0].Username != pick {
+			t.Fatalf("pick %s: entries = %+v", pick, req.Entries)
+		}
+		if req.Entries[0].EmailHash != HashEmail("c1", "jane@example.edu") {
+			t.Errorf("pick %s: email hash not carried through resolution", pick)
+		}
+	}
+}
+
+// An unresolved tie must still be reported as skipped, never silently dropped —
+// BuildPayload's existing skipped-row contract has to cover the new status too.
+func TestUnresolvedAmbiguityIsReportedAsSkipped(t *testing.T) {
+	candidates := []Candidate{
+		{Username: "jdoe1", FullName: "Jane Doe"},
+		{Username: "jdoe2", FullName: "Jane Doe"},
+	}
+	m := MatchRoster([]RosterRow{{Name: "Jane Doe"}}, candidates)[0]
+
+	req, skipped := BuildPayload("c1", []Match{m})
+	if len(req.Entries) != 0 {
+		t.Errorf("an unresolved tie was sent: %+v", req.Entries)
+	}
+	if len(skipped) != 1 {
+		t.Fatalf("skipped = %d, want the unresolved row reported back", len(skipped))
+	}
+	if skipped[0].Status != MatchAmbiguous || skipped[0].Why == "" {
+		t.Errorf("skipped row lost its reason: %+v", skipped[0])
+	}
+}
+
+// A single exact name match is unaffected by the tie handling.
+func TestSingleExactNameStillMatchesDirectly(t *testing.T) {
+	got := MatchRoster(
+		[]RosterRow{{Name: "Jane Doe"}},
+		[]Candidate{{Username: "jdoe", FullName: "Jane Doe"}, {Username: "other", FullName: "Someone Else"}},
+	)[0]
+	if got.Status != MatchExact || got.Username != "jdoe" {
+		t.Errorf("got %+v, want an exact match on jdoe", got)
+	}
+}
+
+// The email local-part is unique per student, so it still wins outright even
+// when several candidates share the LMS display name.
+func TestEmailLocalPartBreaksASameNameTie(t *testing.T) {
+	candidates := []Candidate{
+		{Username: "jdoe1", FullName: "Jane Doe"},
+		{Username: "jdoe2", FullName: "Jane Doe"},
+	}
+	got := MatchRoster([]RosterRow{{Name: "Jane Doe", Email: "jdoe2@example.edu"}}, candidates)[0]
+	if got.Status != MatchExact || got.Username != "jdoe2" {
+		t.Errorf("got %+v, want the email to break the tie to jdoe2", got)
 	}
 }
 

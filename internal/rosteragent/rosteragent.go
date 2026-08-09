@@ -56,6 +56,12 @@ const (
 	// a name variant, a nickname, a reordered "Last, First". The instructor
 	// confirms before it is used. The agent never silently guesses.
 	MatchNeedsConfirm MatchStatus = "needs_confirm"
+	// MatchAmbiguous means several candidates tie and the agent cannot choose
+	// between them — two students with the same name, most often. The tied
+	// candidates are carried in Match.Candidates so the caller can ask the
+	// instructor to pick; without a choice the row stays unused, but it is
+	// resolvable rather than a dead end.
+	MatchAmbiguous MatchStatus = "ambiguous"
 	// MatchNone means no candidate was found. The row is reported, not dropped.
 	MatchNone MatchStatus = "unmatched"
 )
@@ -65,9 +71,30 @@ type Match struct {
 	Row      RosterRow
 	Username string
 	Status   MatchStatus
+	// Candidates holds the tied options when Status is MatchAmbiguous, in a
+	// stable order, so a caller can present them for selection. It is empty for
+	// every other status.
+	Candidates []Candidate
 	// Why explains the decision in audit output, e.g. "exact name match" or
 	// "no candidate above threshold".
 	Why string
+}
+
+// Resolve records the instructor's choice for an ambiguous match, turning it
+// into a confirmed one. It refuses a username that was not among the tied
+// candidates, so a typo at the prompt cannot enrol someone who was never
+// offered.
+func (m *Match) Resolve(username string) error {
+	for _, c := range m.Candidates {
+		if c.Username == username {
+			m.Username = username
+			m.Status = MatchNeedsConfirm
+			m.Why = "ambiguous; resolved by the instructor"
+			m.Candidates = nil
+			return nil
+		}
+	}
+	return fmt.Errorf("%q is not one of the candidates for %q", username, m.Row.Name)
 }
 
 // Candidate is a known Git-host username the matcher can draw from — typically
@@ -98,17 +125,31 @@ func matchOne(row RosterRow, candidates []Candidate) Match {
 	// useful secondary signal — but only ever compared locally.
 	localPart := emailLocalPart(row.Email)
 
-	var confirm []Candidate
+	// Collect every exact-name hit rather than returning the first. Two students
+	// sharing a name is common enough that taking whichever sorted first would
+	// silently enrol the wrong one — the failure this whole tiering exists to
+	// avoid.
+	var exactByName []Candidate
 	for _, c := range candidates {
-		// Strongest signal: the LMS name equals the candidate's known full name.
 		if c.FullName != "" && normalizeName(c.FullName) == target {
-			return Match{Row: row, Username: c.Username, Status: MatchExact, Why: "exact name match"}
+			exactByName = append(exactByName, c)
 		}
-		// Equally strong: the email local-part is exactly the username.
+		// The email local-part equalling a username is a stronger signal than a
+		// shared display name, and is unique per student, so it wins outright.
 		if localPart != "" && strings.EqualFold(localPart, c.Username) {
 			return Match{Row: row, Username: c.Username, Status: MatchExact, Why: "email local-part equals username"}
 		}
 	}
+	switch len(exactByName) {
+	case 1:
+		return Match{Row: row, Username: exactByName[0].Username, Status: MatchExact, Why: "exact name match"}
+	case 0:
+		// fall through to the weaker signals below
+	default:
+		return ambiguous(row, exactByName, "same name")
+	}
+
+	var confirm []Candidate
 
 	// Weaker signals need a human. Collect rather than pick.
 	for _, c := range candidates {
@@ -128,12 +169,25 @@ func matchOne(row RosterRow, candidates []Candidate) Match {
 	case 1:
 		return Match{Row: row, Username: confirm[0].Username, Status: MatchNeedsConfirm, Why: "single near match — confirm before use"}
 	default:
-		names := make([]string, 0, len(confirm))
-		for _, c := range confirm {
-			names = append(names, c.Username)
-		}
-		sort.Strings(names)
-		return Match{Row: row, Status: MatchNone, Why: "ambiguous: " + strings.Join(names, ", ")}
+		return ambiguous(row, confirm, "several near matches")
+	}
+}
+
+// ambiguous builds a resolvable tie. The candidates are sorted by username so
+// the order the instructor sees is stable between runs — a prompt that
+// renumbers its options each time is a prompt people mis-answer.
+func ambiguous(row RosterRow, tied []Candidate, reason string) Match {
+	sorted := append([]Candidate(nil), tied...)
+	sort.Slice(sorted, func(i, j int) bool { return sorted[i].Username < sorted[j].Username })
+	names := make([]string, 0, len(sorted))
+	for _, c := range sorted {
+		names = append(names, c.Username)
+	}
+	return Match{
+		Row:        row,
+		Status:     MatchAmbiguous,
+		Candidates: sorted,
+		Why:        reason + " — choose between " + strings.Join(names, ", "),
 	}
 }
 
@@ -225,9 +279,10 @@ func HashEmail(classroomID, email string) string {
 // hashed emails cross this boundary — it is the last point at which a name or a
 // plaintext address exists in the process.
 //
-// Rows without a username (unmatched, or a declined confirmation) are skipped
-// and returned separately so the caller can report them rather than silently
-// shipping a partial roster.
+// Rows without a username — unmatched, a declined confirmation, or an ambiguity
+// the instructor did not resolve — are skipped and returned separately so the
+// caller can report them rather than silently shipping a partial roster. The
+// test suite pins this for every status that can leave Username empty.
 func BuildPayload(classroomID string, matches []Match) (BulkRequest, []Match) {
 	req := BulkRequest{}
 	var skipped []Match

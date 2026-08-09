@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"os"
 	"sort"
+	"strconv"
 	"strings"
 	"text/tabwriter"
 	"time"
@@ -51,9 +52,11 @@ optionally "username,Full Name" to match on the student's name:
     octocat,Jane Doe
     hubot
 
-Matches are reported in three tiers: exact (used automatically), needs-confirm
-(you are asked, unless --yes), and unmatched (never guessed — listed so you can
-add them by hand). Nothing is sent until you have seen the plan.
+Matches are reported in four tiers: exact (used automatically), needs-confirm
+(you are asked, unless --yes), ambiguous (several candidates tie — you pick from
+a numbered list; --yes and --dry-run never auto-pick, since no rule can choose
+safely), and unmatched (never guessed — listed so you can add them by hand).
+Nothing is sent until you have seen the plan.
 
 If your LMS has no connector, this command says so and points you at manual
 bulk entry rather than failing quietly.
@@ -257,11 +260,70 @@ func reviewMatches(audit *auditLog, matches []rosteragent.Match, assumeYes, dryR
 				audit.printf("declined:  %s → %s", m.Row.Name, m.Username)
 				skipped = append(skipped, m)
 			}
+
+		case rosteragent.MatchAmbiguous:
+			// A tie is resolvable, not a dead end: list the candidates and let
+			// the instructor pick. --yes and --dry-run must NOT auto-pick — the
+			// whole reason this is ambiguous is that no rule can choose safely,
+			// so bulk-accepting would enrol a coin flip.
+			if assumeYes || dryRun {
+				audit.printf("ambiguous: %s — needs an interactive choice; not resolved (%s)",
+					m.Row.Name, m.Why)
+				skipped = append(skipped, m)
+				continue
+			}
+			resolved := promptAmbiguous(reader, &m)
+			if resolved {
+				audit.printf("resolved:  %s → %s", m.Row.Name, m.Username)
+				accepted = append(accepted, m)
+			} else {
+				audit.printf("skipped:   %s — ambiguity left unresolved", m.Row.Name)
+				skipped = append(skipped, m)
+			}
+
 		default:
 			skipped = append(skipped, m)
 		}
 	}
 	return accepted, skipped
+}
+
+// promptAmbiguous lists the tied candidates and applies the instructor's choice
+// to m. It reports whether the row was resolved; an empty answer, "s", or an
+// unparseable one leaves the row unresolved, which the caller reports as
+// skipped. Selection is by number so a mistyped username cannot enrol someone
+// who was never offered — and Match.Resolve rejects that case anyway.
+func promptAmbiguous(reader *bufio.Reader, m *rosteragent.Match) bool {
+	fmt.Printf("\nAmbiguous: %q matches %d candidates.\n", m.Row.Name, len(m.Candidates))
+	if m.Row.Email != "" {
+		// The email is the instructor's best disambiguator and it is already on
+		// their screen from the LMS; it is never transmitted.
+		fmt.Printf("  LMS email: %s\n", m.Row.Email)
+	}
+	for i, c := range m.Candidates {
+		label := c.Username
+		if c.FullName != "" {
+			label += "  (" + c.FullName + ")"
+		}
+		fmt.Printf("  [%d] %s\n", i+1, label)
+	}
+	fmt.Print("Choose 1-", len(m.Candidates), ", or Enter to skip: ")
+
+	line, _ := reader.ReadString('\n')
+	choice := strings.TrimSpace(line)
+	if choice == "" || strings.EqualFold(choice, "s") {
+		return false
+	}
+	n, err := strconv.Atoi(choice)
+	if err != nil || n < 1 || n > len(m.Candidates) {
+		fmt.Printf("  not a listed option; skipping %q\n", m.Row.Name)
+		return false
+	}
+	if err := m.Resolve(m.Candidates[n-1].Username); err != nil {
+		fmt.Printf("  %v; skipping\n", err)
+		return false
+	}
+	return true
 }
 
 func submitBulk(ctx context.Context, f rosterPullFlags, payload rosteragent.BulkRequest, audit *auditLog) error {

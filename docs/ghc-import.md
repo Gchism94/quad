@@ -259,6 +259,17 @@ Two honest caveats, recorded on every imported grade:
 
 Pass `--no-grades` to skip them.
 
+**Backfilling grades before import.** If a course graded outside the
+Autograder, `accepted_assignments[].grade` is null for every submission —
+there is no separate manual-grade field to read instead. The only way to
+populate it is upstream, in Classroom itself: add autograding tests to the
+assignment (even retroactively, after acceptance) and trigger a run against
+the existing repos, then re-run the import — idempotent, so it only fills in
+the previously-null `Grade` rows. This computes a new autograded score rather
+than recovering an original human-assigned one; see
+[`migrate-from-github-classroom.md`](migrate-from-github-classroom.md) §8 for
+the full walkthrough and the tradeoff.
+
 ### Group assignments are imported with a known limitation
 
 Every team member gets a roster entry. But Cairn's `Submission` has a single

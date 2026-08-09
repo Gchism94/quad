@@ -47,8 +47,23 @@ integrates for the full semester from the first assignment.
   2026-08-06: Docker install → build → `docker compose up -d` (2m06s) → `cairn
   doctor` green → classroom created in the dashboard; grading's socket + shared
   work directory confirmed on native Linux; survives reboot with data intact
-- [ ] Student-facing views completed
-- [ ] docs/migrate-from-github-classroom.md — the afternoon migration guide
+- [x] Student-facing views completed *(already built — `internal/api/student.go`
+  + `studentpage.go`, 7 tests backing isolation/401/404/privilege refusal; the
+  checkbox was never ticked. Marked during CC-CA2 after an end-to-end check
+  against a real classroom.)*
+- [x] docs/migrate-from-github-classroom.md — the afternoon migration guide
+  *(CC-CA2, executed against a real classroom before writing)*
+
+**Known caveat, surfaced by CC-CA2's real-classroom run, not yet fixed:** a
+classroom that graded outside GitHub Classroom's own Autograder imports with
+**zero grades** — `accepted_assignments[].grade` is null for every submission,
+and there is no other field to read (202/202 in the tested classroom). The
+mitigation is documented in `docs/migrate-from-github-classroom.md` §8 and
+`docs/ghc-import.md`: add autograding tests to the assignment retroactively
+and re-run the import — which computes a *new* autograded score, not a
+recovery of an original human-assigned one. Not pilot-blocking for a fresh
+term starting on the Autograder from day one, but likely to surprise an
+instructor migrating a completed or externally-graded course.
 
 ## UX polish — queued 2026-08-09, from an instructor/student review
 Not pilot-blocking, but cheap and worth doing before the pilot term starts.

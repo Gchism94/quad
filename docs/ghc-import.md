@@ -257,6 +257,16 @@ Two honest caveats, recorded on every imported grade:
 - Each grade's `breakdown` records `{"source":"github-classroom","raw":"10/90"}`, so
   an imported score is always distinguishable from one Cairn itself produced.
 
+**Verified against real grades, 2026-08-09.** This path was checked end to end
+against `INFO-523-S26` (classroom 298020), which carries 11 non-null grades
+across `hw-02`, `ex-06`, `ex-08`, `ex-09`, and `ex-12` (its other 199
+submissions are null). Ground truth was read from the raw Classroom API JSON
+before importing, then compared field by field against the resulting `Grade`
+rows: **all 11 matched exactly** on student, `score`, `max_score`,
+`breakdown.raw`, and `breakdown.source` — `"10/90"` → 10/90, `"90/90"` →
+90/90. The import created 11 grades and reported 199 with none, matching the
+source one-to-one.
+
 Pass `--no-grades` to skip them.
 
 **A course with no grades in Classroom imports with no grades in Cairn, and
@@ -265,12 +275,26 @@ populated only by Classroom's own Autograding runs; a course graded by hand,
 in an LMS, or with any other tool simply has nothing in that field, for every
 submission. This will be common across migrating courses, not unusual. There
 is no separate manual-grade field to read instead, and the import is not
-lossy here — there was nothing to import. An instructor who specifically
-wants an autograded score after the fact can add autograding tests to the
-assignment retroactively and trigger a run against the existing repos before
-re-running the (idempotent) import, but that computes a new score rather
+lossy here — there was nothing to import.
+
+**Backfilling those grades by retroactive autograding was tested, and works
+only in one case.** A past deadline does *not* block it: a repo whose
+assignment closed 2026-02-21 was autograded successfully on 2026-02-24 and
+carries a `90/90` grade today. What blocks it is that Classroom only records a
+score for autograding tests **registered in its own UI when the assignment was
+set up**. Pushing a `classroom.yml` into the repos now does not create that
+registration — verified on a real past-deadline repo with no autograding
+configured, where the workflow ran, every step including the Autograding
+Reporter succeeded, and `accepted_assignments[].grade` stayed null. So
+re-triggering works for an assignment that already had autograding, and is
+impossible for one that never did. Either way it computes a new score rather
 than recovering an original one; see
 [`migrate-from-github-classroom.md`](migrate-from-github-classroom.md) §8.
+
+Classroom exposes no REST endpoint for autograding configuration
+(`/assignments/:id/autograding` and `/autograding_tests` both 404), so the
+registration state is only visible indirectly — via the starter repo's
+`.github/workflows/classroom.yml` and the assignment's `passing` count.
 
 ### Group assignments are imported with a known limitation
 

@@ -265,8 +265,9 @@ too.
   students in one assignment) and PII-bearing (it carries student legal
   names), so Cairn does not request it. Grades are imported instead from
   `accepted_assignments[].grade`, a string like `"10/90"` — populated only by
-  Classroom's own Autograding runs (GitHub Actions), and only where that
-  field is non-null. The classroom this guide was tested against
+  Classroom's own Autograding runs (GitHub Actions), for assignments that had
+  autograding tests registered in Classroom, and only where that field is
+  non-null. The classroom this guide was tested against
   (INFO-526-SU26) simply never had grades in Classroom's system at all —
   **202 of 202 submissions, null across the board** — not a case of grades
   existing somewhere and failing to transfer. Expect this to be common, not
@@ -279,17 +280,40 @@ too.
   source, so an imported score is always distinguishable from one Cairn
   produced.
 
-  **Optional, only if you specifically want an autograded score after the
-  fact:** GitHub Classroom lets you add autograding tests to an assignment
-  retroactively, even after acceptance, then trigger a run against each
-  already-accepted repo (a `workflow_dispatch` or a trivial commit is enough)
-  so the Autograder computes and stores a score — do this **before your
-  final snapshot**, then re-run `cairn import ghc` (idempotent; it only fills
-  in the previously-null rows). This computes a *new* score against whatever
-  tests you add now — it does not recover whatever a TA, Gradescope, Canvas,
-  or a spreadsheet originally assigned, and it is not something most
-  instructors migrating a finished course will want to do. Mentioned here
-  for completeness, not as the expected path.
+  **On backfilling a score after the fact — tested, and mostly it does not
+  work.** An earlier version of this guide suggested adding autograding tests
+  retroactively and triggering a run to populate the missing grades. That path
+  was run for real against a live past-deadline classroom, and the result is
+  narrower than it sounded:
+
+  - **A passed deadline is not the obstacle.** The Actions workflow still
+    runs on an old repo, and Classroom still records the score. Verified: a
+    repo whose assignment closed 2026-02-21 had a successful autograding run
+    on **2026-02-24** and carries a `90/90` grade today. Past-deadline repos
+    are not locked, archived, or refused.
+  - **The obstacle is that Classroom only records grades for autograding
+    tests registered in its own UI, when the assignment was set up.** Pushing
+    a `classroom.yml` into student repos now does not create that
+    registration. Verified on a real past-deadline repo with no autograding
+    configured: the workflow ran, every step including the Autograding
+    Reporter succeeded — and `accepted_assignments[].grade` stayed **null**.
+    A re-import produced 0 grades, exactly as before.
+
+  So if your assignment **already had autograding tests configured in
+  Classroom**, re-triggering a run does work, deadline notwithstanding — do
+  it **before your final snapshot**, then re-run `cairn import ghc`
+  (idempotent; it fills in the previously-null rows). If it **did not**, there
+  is no way to make Classroom compute and store a score for it now, and this
+  is not a limitation Cairn can work around — the grade field Cairn reads is
+  Classroom's to populate. In that case grade your repos in Cairn instead,
+  where you control the grading spec.
+
+  To tell which case you are in without running anything: check whether the
+  assignment's **starter repo** contains `.github/workflows/classroom.yml`,
+  and look at the assignment's `passing` count. A course with autograding
+  configured has both; one without has neither. Note also that this computes a
+  *new* score against those tests — it never recovers what a TA, Gradescope,
+  Canvas, or a spreadsheet originally assigned.
 - **Group assignments import with a known limitation.** Every team member
   gets a roster entry, but Cairn's `Submission` has a single
   `roster_entry_id`, so the team's shared repo attaches to one deterministic

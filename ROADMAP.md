@@ -62,22 +62,32 @@ there was nothing in Classroom to bring over (202/202 in the tested
 classroom, confirmed by Greg as a course that never had grades in Classroom
 at all). This will be the common case across migrating courses, not the
 exception, and the guide states it plainly rather than treating it as a bug.
-An optional, non-default backfill path (retroactive autograding, then
-re-import) is documented in `docs/migrate-from-github-classroom.md` §8 and
-`docs/ghc-import.md` for instructors who specifically want an autograded
-score — it computes a new score, not a recovery of an original one, and most
-instructors migrating a finished course won't want it.
+**The backfill path has now been tested for real (CC-CA4, 2026-08-09), and
+the answer is narrower than the docs first suggested.** Both docs above are
+corrected to match:
 
-**That backfill path is untested.** Greg: Classroom has a known,
-long-standing problem computing/recording grades after a deadline has
-passed, which is why grades were rarely present at all — so retroactive
-autograding may hit the same failure post-deadline rather than simply
-working. `docs/prompts/CC-CA4-retroactive-autograding-poc.md` is queued to
-run it for real against a small sample (2-3 repos) of one of Greg's real
-past-deadline classrooms, plus a control check against a classroom that
-already has real grades (to confirm import fidelity on data known to exist,
-which CC-CA2 never got to check). The docs get corrected with real evidence
-once that runs. Not pilot-blocking.
+- **A passed deadline is not what blocks grades.** A repo whose assignment
+  closed 2026-02-21 was autograded successfully on 2026-02-24 and carries a
+  `90/90` grade — post-deadline runs execute and are recorded. Past-deadline
+  repos are not locked, archived, or refused.
+- **What blocks it is that Classroom only records a score for autograding
+  tests registered in its own UI when the assignment was set up.** Tested
+  live on a real past-deadline repo with no autograding configured
+  (`INFO-526-SU26/final-project-Gchism94`, Greg's own, not a student's): a
+  minimal `classroom.yml` was pushed, `workflow_dispatch` ran, every step
+  including the Autograding Reporter succeeded — and
+  `accepted_assignments[].grade` stayed **null**. Re-import produced 0
+  grades. The test artifact was reverted. So the backfill works only for an
+  assignment that already had autograding configured, and is impossible for
+  one that never did. Neither case is something Cairn can change; the field
+  is Classroom's to populate.
+
+**Grade import fidelity is now verified, closing a gap CC-CA2 left open.**
+Its classroom had zero grades, so the happy path was only ever asserted.
+Checked against `INFO-523-S26` (11 real non-null grades): ground truth read
+from the raw API before import, then compared field by field — **all 11 rows
+matched exactly** on `score`, `max_score`, `breakdown.raw`, and
+`breakdown.source`.
 
 ## UX polish — queued 2026-08-09, from an instructor/student review
 Not pilot-blocking, but cheap and worth doing before the pilot term starts.

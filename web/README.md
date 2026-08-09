@@ -21,12 +21,37 @@ In dev, Vite proxies the API path prefixes (`/classrooms`, `/assignments`,
 `/auth`, `/healthz`) to the Go server, so the browser stays same-origin and no
 CORS configuration is needed. Point the proxy elsewhere with `CAIRN_API_URL`.
 
+## Test
+
+```sh
+npm test           # run the unit tests once (Vitest)
+npm run test:watch # re-run on change while developing
+```
+
+Vitest runs in a `node` environment — the tested units are pure functions
+(roster parsing and hashing, URL builders), so no DOM implementation is
+needed; the one browser API a test touches (`window.location.origin`) is
+stubbed per-test. Config lives in `vitest.config.ts`, kept separate from
+`vite.config.ts` so test settings cannot affect the production build.
+
+`src/roster-parse.test.ts` covers the privacy-critical property that a
+plaintext email address never reaches the API payload, and pins the hash
+vectors shared with the Go agent (`internal/rosteragent`) so the two
+implementations cannot silently diverge.
+
+There is no CI in this repo yet, so **run this before pushing** — nothing
+else will.
+
 ## Build
 
 ```sh
 npm run build      # type-checks (tsc --noEmit) then emits static files to dist/
 npm run preview    # serve the production build locally
 ```
+
+`build` deliberately does *not* run the tests: it executes inside the
+production `Dockerfile`, and a failing test should stop a contributor, not a
+deploy.
 
 Serve `dist/` behind the same origin as the API (a reverse proxy, or the Go
 server itself) so the app's relative API calls resolve. The simplest path is to

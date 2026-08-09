@@ -1,0 +1,104 @@
+# Continuous integration: run the checks a contributor is asked to run locally.
+#
+# One file, two jobs. Go and the dashboard have no build-order dependency on
+# each other, so they run in parallel and each reports its own status — a Go
+# failure and a frontend failure are separately legible on the PR rather than
+# hidden behind whichever tripped first. They live in one file because they are
+# one gate ("does this change pass CI?"), and splitting them across files would
+# make the shared triggers drift over time.
+#
+# Deliberately out of scope: no deployment or release workflow, and no gVisor.
+# The isolation-tier tests assert the arguments the runner constructs rather
+# than executing a live `runsc`, precisely so CI never needs it installed.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# A newer push to the same branch or PR makes the previous run irrelevant.
+# main is excluded so pushes there always produce a complete, citable result.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+permissions:
+  contents: read
+
+jobs:
+  go:
+    name: Go — build, vet, test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-go@v6
+        with:
+          # Exactly the version go.mod requires. Pinned rather than floating so
+          # a toolchain bump is a visible commit, not a silent change in what
+          # CI actually verified.
+          go-version-file: go.mod
+          # Caches the module and build caches, keyed on go.sum.
+          cache: true
+
+      # The PR template asks contributors for `gofmt -l .` clean, so CI checks
+      # the same thing rather than leaving it to reviewers to eyeball.
+      - name: gofmt
+        run: |
+          unformatted="$(gofmt -l .)"
+          if [ -n "$unformatted" ]; then
+            echo "These files are not gofmt-clean:"
+            echo "$unformatted"
+            gofmt -d .
+            exit 1
+          fi
+
+      - name: go build
+        run: go build ./...
+
+      - name: go vet
+        run: go vet ./...
+
+      # -race is the norm in this repo and is kept here on purpose: the runner,
+      # the provisioning queue, and the session store are all concurrent, and a
+      # data race there is exactly the class of bug a non-race run misses.
+      - name: go test (race)
+        run: go test ./... -race -count=1
+
+  web:
+    name: Dashboard — typecheck, test, build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          # Node 22 is the intersection of what the toolchain requires and what
+          # actually ships this dashboard: Vite 7 needs ^20.19 || >=22.12,
+          # Vitest 4 needs ^20 || ^22 || >=24, and the Dockerfile's web stage
+          # builds on node:22-alpine. Matching the image means CI cannot pass on
+          # a Node version the release build never uses.
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      # `ci`, not `install`: a reproducible install from the committed lockfile,
+      # which also fails loudly if package.json and package-lock.json disagree.
+      - name: npm ci
+        run: npm ci
+
+      - name: typecheck
+        run: npm run typecheck
+
+      - name: test
+        run: npm test
+
+      # `build` is a separate step from `test` on purpose — locally the two are
+      # kept apart so a failing test stops a contributor without blocking the
+      # production image build, and CI is where both are required together.
+      - name: build
+        run: npm run build

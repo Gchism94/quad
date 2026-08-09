@@ -182,11 +182,11 @@ func (s *Server) routes() {
 	// ServeMux gives more specific patterns precedence, every API route above
 	// still wins; this catch-all handles "/", static assets, and SPA fallback.
 	if s.webDir != "" {
-		s.mux.HandleFunc("GET /", staticSPAHandler(s.webDir))
+		s.mux.HandleFunc("GET /", s.studentRootRedirect(staticSPAHandler(s.webDir)))
 	} else {
 		// No dashboard: serve a small inline status page at exactly "/".
 		// All other unknown paths remain 404.
-		s.mux.HandleFunc("GET /{$}", s.handleStatusPage)
+		s.mux.HandleFunc("GET /{$}", s.studentRootRedirect(s.handleStatusPage))
 	}
 }
 
@@ -367,6 +367,33 @@ func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"status": "logged_out"})
 }
 
+// studentRootRedirect sends a signed-in student who lands on "/" to their own
+// page instead of the instructor console. The console resolves identity through
+// GET /auth/me, which is operator-only by design, so a perfectly valid student
+// session renders as "not signed in" on a screen built for instructors — a dead
+// end with no link back to /me.
+//
+// Only the exact root is redirected. The SPA handler is a catch-all that also
+// serves static assets and SPA fallback routes, and redirecting those would
+// break the dashboard for anyone holding a student session.
+//
+// Operators and unauthenticated visitors always fall through to next.
+func (s *Server) studentRootRedirect(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/" {
+			next(w, r)
+			return
+		}
+		// A session that is present and not an operator is a student. An expired
+		// or absent cookie is not ok, so anonymous visitors fall through.
+		if sess, ok := s.sessionFromCookie(r); ok && !sess.isOperator {
+			http.Redirect(w, r, "/me", http.StatusFound)
+			return
+		}
+		next(w, r)
+	}
+}
+
 // staticSPAHandler serves files from dir, falling back to index.html for paths
 // that don't resolve to a file (so a single-page app can own client routing).
 // http.Dir sanitizes the request path, so directory traversal is not possible —
@@ -408,6 +435,7 @@ code{background:#f4f4f4;padding:.1em .3em;border-radius:3px}</style></head>
 <p id="auth">Checking session…</p>
 <ul>
   <li><a href="/auth/login">Operator login</a></li>
+  <li><a href="/student/login">Student sign-in</a></li>
   <li><a href="/healthz">Health check</a></li>
 </ul>
 <p><em>Dashboard not mounted — set <code>CAIRN_WEB_DIR=web/dist</code> and restart.</em></p>

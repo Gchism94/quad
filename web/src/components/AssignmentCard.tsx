@@ -16,7 +16,15 @@ function fmtDeadline(iso?: string): string {
   return Number.isNaN(d.getTime()) ? iso : d.toLocaleString();
 }
 
-export function AssignmentCard({ assignment, notify }: { assignment: Assignment; notify: Notify }) {
+export function AssignmentCard({
+  assignment,
+  notify,
+  joinPolicy,
+}: {
+  assignment: Assignment;
+  notify: Notify;
+  joinPolicy?: string;
+}) {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [deadline, setDeadline] = useState(toLocalInput(assignment.deadline));
@@ -47,6 +55,19 @@ export function AssignmentCard({ assignment, notify }: { assignment: Assignment;
       notify(errMsg(e), "err");
     } finally {
       setBusy(false);
+    }
+  }
+
+  // Copy the student join URL. navigator.clipboard is unavailable outside a
+  // secure context (plain http on a non-localhost host), so surface the URL in
+  // the toast on failure rather than leaving the instructor with nothing.
+  async function copyInvite() {
+    const url = api.inviteUrl(assignment.id);
+    try {
+      await navigator.clipboard.writeText(url);
+      notify("Invite link copied");
+    } catch {
+      notify(`Copy failed — the link is ${url}`, "err");
     }
   }
 
@@ -91,6 +112,17 @@ export function AssignmentCard({ assignment, notify }: { assignment: Assignment;
         </div>
 
         <div className="assignment-actions">
+          <Button
+            small
+            onClick={() => void copyInvite()}
+            title={
+              joinPolicy === "roster"
+                ? "Students must be on the roster first"
+                : "Open to anyone with the link"
+            }
+          >
+            Copy invite link
+          </Button>
           <Button small disabled={busy} onClick={() => void run("Grade", () => api.grade(assignment.id))}>
             Grade
           </Button>
@@ -105,6 +137,15 @@ export function AssignmentCard({ assignment, notify }: { assignment: Assignment;
 
       {open && (
         <div className="assignment-drawer">
+          <p className="muted small">
+            Invite link: <code>{api.inviteUrl(assignment.id)}</code>{" "}
+            {joinPolicy === "roster"
+              ? "— students must be on the roster first."
+              : joinPolicy === "open"
+                ? "— open to anyone with the link."
+                : null}
+          </p>
+
           <div className="deadline-row">
             <label htmlFor={`dl-${assignment.id}`}>Deadline</label>
             <input

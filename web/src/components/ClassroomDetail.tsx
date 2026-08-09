@@ -70,7 +70,7 @@ export function ClassroomDetail({ classroom, notify }: { classroom: Classroom; n
         ) : (
           assignments.map((a, i) => (
             <div key={a.id} className="fade-in" style={{ animationDelay: `${i * 45}ms` }}>
-              <AssignmentCard assignment={a} notify={notify} />
+              <AssignmentCard assignment={a} notify={notify} joinPolicy={classroom.join_policy} />
             </div>
           ))
         )}

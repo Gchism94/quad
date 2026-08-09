@@ -76,6 +76,9 @@ export default function App() {
           <p className="small muted login-note">
             Access is limited to operators allowlisted on this instance.
           </p>
+          <p className="small muted login-note">
+            Returning student? <a href="/student/login">Sign in here</a>.
+          </p>
         </div>
       </div>
     );

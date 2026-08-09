@@ -9,6 +9,10 @@ export interface Classroom {
   name: string;
   host: Host;
   host_namespace: string;
+  // "open" (any authenticated student on the host may self-enroll) or "roster"
+  // (only usernames already on the roster). Decides what the invite link's
+  // accompanying note tells the instructor.
+  join_policy: string;
   created_by: string;
   created_at: string;
 }
@@ -134,4 +138,10 @@ export const api = {
   grade: (assignmentID: string) => req<EnqueueResult>("POST", `/assignments/${assignmentID}/grade`),
 
   gradesCsvUrl: (classroomID: string) => `${BASE}/classrooms/${classroomID}/grades.csv`,
+
+  // The student-facing join URL for an assignment. Unlike gradesCsvUrl this is
+  // absolute: it is copied and pasted into an LMS or email, so a same-origin
+  // relative path would be useless to the student receiving it.
+  inviteUrl: (assignmentID: string) =>
+    `${window.location.origin}${BASE}/assignments/${assignmentID}/accept`,
 };

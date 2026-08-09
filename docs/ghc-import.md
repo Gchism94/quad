@@ -259,16 +259,18 @@ Two honest caveats, recorded on every imported grade:
 
 Pass `--no-grades` to skip them.
 
-**Backfilling grades before import.** If a course graded outside the
-Autograder, `accepted_assignments[].grade` is null for every submission —
-there is no separate manual-grade field to read instead. The only way to
-populate it is upstream, in Classroom itself: add autograding tests to the
-assignment (even retroactively, after acceptance) and trigger a run against
-the existing repos, then re-run the import — idempotent, so it only fills in
-the previously-null `Grade` rows. This computes a new autograded score rather
-than recovering an original human-assigned one; see
-[`migrate-from-github-classroom.md`](migrate-from-github-classroom.md) §8 for
-the full walkthrough and the tradeoff.
+**A course with no grades in Classroom imports with no grades in Cairn, and
+that is expected — not a special case.** `accepted_assignments[].grade` is
+populated only by Classroom's own Autograding runs; a course graded by hand,
+in an LMS, or with any other tool simply has nothing in that field, for every
+submission. This will be common across migrating courses, not unusual. There
+is no separate manual-grade field to read instead, and the import is not
+lossy here — there was nothing to import. An instructor who specifically
+wants an autograded score after the fact can add autograding tests to the
+assignment retroactively and trigger a run against the existing repos before
+re-running the (idempotent) import, but that computes a new score rather
+than recovering an original one; see
+[`migrate-from-github-classroom.md`](migrate-from-github-classroom.md) §8.
 
 ### Group assignments are imported with a known limitation
 

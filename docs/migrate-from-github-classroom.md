@@ -259,47 +259,37 @@ too.
   it is still yours to keep running. `docker compose down` keeps data;
   `docker compose down -v` removes the database — back up with `pg_dump`
   before the second one.
-- **Grades do not all come over.** The Classroom `/grades` endpoint is both
-  incomplete (it returned 4 rows for 22 accepted students in one assignment)
-  and PII-bearing (it carries student legal names). Cairn does not request
-  it. Grades are imported instead from `accepted_assignments[].grade`, a
-  string like `"10/90"` — but only where that field is non-null. In the
-  classroom this guide was tested against, **202 submissions had no grade to
-  import at all** — the field was null across the board. If your Classroom
-  grades were managed outside the Autograder, they will not appear in Cairn
-  and you will need to re-grade or re-enter them. Imported grades carry
-  `graded_at` as the import time (not the original grading time, which the
-  API does not expose accurately) and a `breakdown` marking their source, so
-  an imported score is always distinguishable from one Cairn produced.
+- **Grades come over only where Classroom itself has them — and plenty of
+  courses will have none, which is normal, not a defect.** The Classroom
+  `/grades` endpoint is both incomplete (it returned 4 rows for 22 accepted
+  students in one assignment) and PII-bearing (it carries student legal
+  names), so Cairn does not request it. Grades are imported instead from
+  `accepted_assignments[].grade`, a string like `"10/90"` — populated only by
+  Classroom's own Autograding runs (GitHub Actions), and only where that
+  field is non-null. The classroom this guide was tested against
+  (INFO-526-SU26) simply never had grades in Classroom's system at all —
+  **202 of 202 submissions, null across the board** — not a case of grades
+  existing somewhere and failing to transfer. Expect this to be common, not
+  an edge case: any course graded by hand, in an LMS, or with a tool other
+  than the Autograder arrives in Cairn with a roster and repos and **no**
+  grades, and that is an accurate migration, not a lossy one — there was
+  nothing in Classroom to bring over. Imported grades, where they do exist,
+  carry `graded_at` as the import time (not the original grading time, which
+  the API does not expose accurately) and a `breakdown` marking their
+  source, so an imported score is always distinguishable from one Cairn
+  produced.
 
-  **If you want those grades to come across, there is a path — it just
-  changes what the grade means.** The `grade` field GitHub exposes is
-  populated by Classroom's own Autograding runs (GitHub Actions), not by any
-  general manual-entry field — GitHub's own autograding documentation
-  describes no separate override, and none was found. If your course graded
-  outside the Autograder, the fix is upstream of Cairn, in Classroom itself,
-  and it has to happen **before your final snapshot**:
-
-  1. Add autograding tests to the assignment (Classroom → assignment
-     settings → Autograding). GitHub Classroom allows this after the
-     assignment has already been accepted.
-  2. Trigger a run against each already-accepted repo — a `workflow_dispatch`
-     or a trivial commit is enough to fire the Actions workflow — so the
-     Autograder computes and stores a score.
-  3. Re-run `cairn import ghc --classroom <id> --snapshot ...` (or capture a
-     fresh snapshot first). The import is idempotent, so this only fills in
-     the `Grade` rows that were previously skipped as null; nothing else is
-     touched.
-
-  **Be clear-eyed about what this produces**: a *new* score against whatever
-  tests you add now, not a recovery of whatever a TA, Gradescope, Canvas, or
-  a spreadsheet originally assigned. For many courses an autograded score is
-  a fine substitute for none; for a course whose grading depended on human
-  judgment, it is not equivalent, and re-entering the original scores by hand
-  after import may be the more honest choice. This is the instructor's call,
-  not something the import makes for you. The classroom this guide was
-  tested against had not used the Autograder, which is why this option is
-  documented here rather than exercised in the guide's own test run.
+  **Optional, only if you specifically want an autograded score after the
+  fact:** GitHub Classroom lets you add autograding tests to an assignment
+  retroactively, even after acceptance, then trigger a run against each
+  already-accepted repo (a `workflow_dispatch` or a trivial commit is enough)
+  so the Autograder computes and stores a score — do this **before your
+  final snapshot**, then re-run `cairn import ghc` (idempotent; it only fills
+  in the previously-null rows). This computes a *new* score against whatever
+  tests you add now — it does not recover whatever a TA, Gradescope, Canvas,
+  or a spreadsheet originally assigned, and it is not something most
+  instructors migrating a finished course will want to do. Mentioned here
+  for completeness, not as the expected path.
 - **Group assignments import with a known limitation.** Every team member
   gets a roster entry, but Cairn's `Submission` has a single
   `roster_entry_id`, so the team's shared repo attaches to one deterministic

@@ -54,16 +54,19 @@ integrates for the full semester from the first assignment.
 - [x] docs/migrate-from-github-classroom.md — the afternoon migration guide
   *(CC-CA2, executed against a real classroom before writing)*
 
-**Known caveat, surfaced by CC-CA2's real-classroom run, not yet fixed:** a
-classroom that graded outside GitHub Classroom's own Autograder imports with
-**zero grades** — `accepted_assignments[].grade` is null for every submission,
-and there is no other field to read (202/202 in the tested classroom). The
-mitigation is documented in `docs/migrate-from-github-classroom.md` §8 and
-`docs/ghc-import.md`: add autograding tests to the assignment retroactively
-and re-run the import — which computes a *new* autograded score, not a
-recovery of an original human-assigned one. Not pilot-blocking for a fresh
-term starting on the Autograder from day one, but likely to surprise an
-instructor migrating a completed or externally-graded course.
+**Known, expected behavior, surfaced by CC-CA2's real-classroom run —
+not a defect and not unique to that classroom:** a course that graded
+outside GitHub Classroom's own Autograder imports with **zero grades**,
+because `accepted_assignments[].grade` is simply null for every submission —
+there was nothing in Classroom to bring over (202/202 in the tested
+classroom, confirmed by Greg as a course that never had grades in Classroom
+at all). This will be the common case across migrating courses, not the
+exception, and the guide states it plainly rather than treating it as a bug.
+An optional, non-default backfill path (retroactive autograding, then
+re-import) is documented in `docs/migrate-from-github-classroom.md` §8 and
+`docs/ghc-import.md` for instructors who specifically want an autograded
+score — it computes a new score, not a recovery of an original one, and most
+instructors migrating a finished course won't want it. Not pilot-blocking.
 
 ## UX polish — queued 2026-08-09, from an instructor/student review
 Not pilot-blocking, but cheap and worth doing before the pilot term starts.

@@ -50,6 +50,17 @@ integrates for the full semester from the first assignment.
 - [ ] Student-facing views completed
 - [ ] docs/migrate-from-github-classroom.md — the afternoon migration guide
 
+## UX polish — queued 2026-08-09, from an instructor/student review
+Not pilot-blocking, but cheap and worth doing before the pilot term starts.
+See `docs/prompts/CC-CA3-invite-link-and-student-landing.md`.
+- [ ] Copy-invite-link action on each assignment card (the join URL is a real
+  route already — `/assignments/{id}/accept` — but nothing in the UI surfaces
+  it, so instructors hand-build it)
+- [ ] Stop serving the instructor login screen at `/` to a student who is
+  already signed in. Confirmed in code: a valid student session 401s against
+  `/auth/me` (operator-only), so the SPA shows "sign in" to someone already
+  authenticated, with no link to `/me` or `/student/login`.
+
 ## Phase 3 — Ephemeral LMS roster agent
 - [ ] Open, auditable local agent (browser extension / CLI)
 - [ ] Instructor-token API pull (Canvas/Moodle/Brightspace); DOM scrape fallback

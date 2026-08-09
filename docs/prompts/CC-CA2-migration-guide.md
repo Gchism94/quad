@@ -31,7 +31,14 @@ two open pilot-sprint items. Only one is actually open:
 **The acceptance bar, from `KICKOFF-PROMPT.md` Session 3, quoted because it is
 the whole point:** *"the guide has been executed as written, not just read."* A
 guide that has never been run is a hypothesis. Do not write this from the source
-tree and existing docs alone.*
+tree and existing docs alone.
+
+**Confirmed 2026-08-09: run this against Greg's own real, live GitHub
+Classroom — not a seeded fixture.** Everything in §2 and §5 below that
+mentions "real (or seeded)" is resolved: it's real. This is a stronger and more
+useful test than a fixture, and it means the report in §5 should speak plainly
+about this specific classroom's roster/assignment shape rather than hedging
+about which parts were simulated.*
 
 ---
 
@@ -52,9 +59,9 @@ tree and existing docs alone.*
 
 ## 2. Execute the path before documenting it
 
-Run the whole thing yourself, in order, on a real (or realistically seeded)
-classroom. Record what actually happens, including the parts that are slower or
-uglier than expected:
+Run the whole thing yourself, in order, on Greg's real GitHub Classroom
+(confirmed 2026-08-09 — not a seeded fixture). Record what actually happens,
+including the parts that are slower or uglier than expected:
 
 1. Deploy Cairn (per `docs/deploy.md`).
 2. `cairn doctor` green.
@@ -113,8 +120,9 @@ Keep the prose in this repo's existing register: direct, specific, no marketing.
 
 ## 5. Report
 
-- Confirm you executed the path end to end, and say on what (real classroom,
-  seeded fixture, or a mix — be specific about which steps were which).
+- Confirm you executed the path end to end against Greg's real GitHub
+  Classroom (per the 2026-08-09 confirmation above). If any single step had
+  to fall back to a seeded/simulated stand-in, say exactly which and why.
 - Every place reality diverged from the documented happy path, listed. This is
   the most valuable part of the report; do not compress it.
 - Whether the student end-to-end check (§2 steps 7–9) passed with a non-operator

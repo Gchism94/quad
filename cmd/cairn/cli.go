@@ -15,9 +15,11 @@ Usage:
   cairn doctor [flags]       check this deployment and say how to fix what is wrong
                              (see docs/deploy.md for the full deployment path)
   cairn import ghc [flags]   import a course from GitHub Classroom
+  cairn roster pull [flags]  build a roster from your LMS, matched locally
   cairn help                 show this message
 
-Run "cairn doctor --help" or "cairn import ghc --help" for their flags.
+Run "cairn doctor --help", "cairn import ghc --help", or
+"cairn roster pull --help" for their flags.
 `
 
 func main() {
@@ -44,6 +46,20 @@ func main() {
 			}
 		default:
 			fatalUsage(fmt.Sprintf("cairn import: unknown source %q (supported: ghc)", args[1]))
+		}
+
+	case "roster":
+		if len(args) < 2 {
+			fatalUsage("cairn roster: expected a subcommand, e.g. `cairn roster pull`")
+		}
+		switch args[1] {
+		case "pull":
+			if err := runRosterPull(args[2:]); err != nil {
+				fmt.Fprintf(os.Stderr, "cairn roster pull: %v\n", err)
+				os.Exit(1)
+			}
+		default:
+			fatalUsage(fmt.Sprintf("cairn roster: unknown subcommand %q (supported: pull)", args[1]))
 		}
 
 	case "doctor":

@@ -51,8 +51,11 @@ verified. Never omit the Report section.
 ## Git conventions
 
 - No `Co-Authored-By: Claude` trailers in this repo's commits. If unsure,
-  `git log -5 | grep -c Co-Authored-By` should return `0` — this repo has an
-  explicit "turn off Claude co-author trailers" commit in its history.
+  check actual trailers, not prose: `git log -5 --format='%(trailers:key=Co-Authored-By)'`
+  should print nothing. A plain `grep -c Co-Authored-By` over the log can
+  false-positive on prose describing the convention — this repo's own "turn
+  off Claude co-author trailers" commit message is exactly that trap (caught
+  by CC-CA5, 2026-08-09).
 - Prefer new commits over amends; never force-push without being asked.
 
 ## Where things are

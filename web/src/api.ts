@@ -46,6 +46,25 @@ export interface RosterEntry {
   claimed_at?: string;
 }
 
+export interface BulkRosterEntry {
+  username: string;
+  email_hash?: string;
+}
+
+export interface BulkRosterResult {
+  username: string;
+  status: "created" | "already_present" | "error";
+  error?: string;
+  entry?: RosterEntry;
+}
+
+export interface BulkRosterResponse {
+  created: number;
+  already_present: number;
+  errors: number;
+  results: BulkRosterResult[];
+}
+
 export interface RepoRef {
   host: Host;
   namespace: string;
@@ -126,6 +145,8 @@ export const api = {
     req<RosterEntry[]>("GET", `/classrooms/${classroomID}/roster`),
   addRoster: (classroomID: string, b: { username: string; email_hash?: string }) =>
     req<RosterEntry>("POST", `/classrooms/${classroomID}/roster`, b),
+  addRosterBulk: (classroomID: string, entries: BulkRosterEntry[]) =>
+    req<BulkRosterResponse>("POST", `/classrooms/${classroomID}/roster/bulk`, { entries }),
 
   listSubmissions: (assignmentID: string) =>
     req<SubmissionView[]>("GET", `/assignments/${assignmentID}/submissions`),

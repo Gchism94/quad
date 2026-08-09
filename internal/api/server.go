@@ -169,6 +169,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /classrooms", protect(s.handleCreateClassroom))
 	s.mux.HandleFunc("GET /classrooms/{id}/roster", protect(s.handleListRoster))
 	s.mux.HandleFunc("POST /classrooms/{id}/roster", protect(s.handleAddRoster))
+	s.mux.HandleFunc("POST /classrooms/{id}/roster/bulk", protect(s.handleAddRosterBulk))
 	s.mux.HandleFunc("GET /classrooms/{id}/assignments", protect(s.handleListAssignments))
 	s.mux.HandleFunc("POST /classrooms/{id}/assignments", protect(s.handleCreateAssignment))
 	s.mux.HandleFunc("GET /classrooms/{id}/grades.csv", protect(s.handleGradesCSV))
@@ -618,6 +619,122 @@ func (s *Server) handleAddRoster(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusCreated, re)
+}
+
+// maxBulkRosterRows bounds a single bulk request. It is generous for a real
+// class (the largest lecture sections run ~150) but small enough that pasting
+// the wrong file entirely fails fast instead of partially importing garbage.
+const maxBulkRosterRows = 500
+
+// bulkRosterResult is the per-row outcome. Every row in the request gets exactly
+// one of these back, at the same index, so the caller can map a failure to the
+// line the instructor pasted.
+type bulkRosterResult struct {
+	Username string `json:"username"`
+	// Status is "created", "already_present", or "error".
+	Status string `json:"status"`
+	// Error explains a "error" status; empty otherwise.
+	Error string `json:"error,omitempty"`
+	// Entry is the roster entry for "created" and "already_present".
+	Entry *store.RosterEntry `json:"entry,omitempty"`
+}
+
+// handleAddRosterBulk adds many roster entries in one request. Rows are
+// processed independently on purpose: an instructor pasting thirty names should
+// get twenty-nine successes and one actionable error, not a single failure for
+// the whole batch. The response is therefore always 200 with per-row statuses —
+// a non-2xx here would mean the request itself was unusable, not that some row
+// was bad.
+//
+// Re-submitting the same list is a no-op for rows that already exist, so fixing
+// one bad line and pasting again does not duplicate the rest.
+func (s *Server) handleAddRosterBulk(w http.ResponseWriter, r *http.Request) {
+	cls, ok := s.requireClassroom(w, r)
+	if !ok {
+		return
+	}
+	var in struct {
+		Entries []struct {
+			Username  string `json:"username"`
+			EmailHash string `json:"email_hash"`
+		} `json:"entries"`
+	}
+	if !readJSON(w, r, &in) {
+		return
+	}
+	if len(in.Entries) == 0 {
+		httpError(w, http.StatusBadRequest, "entries is required and must not be empty")
+		return
+	}
+	if len(in.Entries) > maxBulkRosterRows {
+		httpError(w, http.StatusBadRequest,
+			fmt.Sprintf("too many entries: %d exceeds the limit of %d per request", len(in.Entries), maxBulkRosterRows))
+		return
+	}
+
+	results := make([]bulkRosterResult, 0, len(in.Entries))
+	var created, alreadyPresent, failed int
+
+	// Usernames seen earlier in this same request, so a list containing the same
+	// name twice reports the second one as already present rather than racing to
+	// create a duplicate.
+	seen := make(map[string]bool, len(in.Entries))
+
+	for _, row := range in.Entries {
+		username := strings.TrimSpace(row.Username)
+		res := bulkRosterResult{Username: username}
+
+		switch {
+		case username == "":
+			res.Status, res.Error = "error", "username is required"
+		case !validSlug(username):
+			res.Status, res.Error = "error", "username must be non-empty, ≤100 chars, contain only [A-Za-z0-9._-], and not start with '-' or '.'"
+		default:
+			existing, err := s.store.FindRosterEntryByUsername(r.Context(), cls.ID, username)
+			switch {
+			case err == nil:
+				res.Status, res.Entry = "already_present", existing
+			case !errors.Is(err, store.ErrNotFound):
+				res.Status, res.Error = "error", err.Error()
+			case seen[username]:
+				// Duplicated within this request; the first occurrence created it.
+				res.Status = "already_present"
+			default:
+				re := &store.RosterEntry{
+					ID:           id.New(),
+					ClassroomID:  cls.ID,
+					Host:         cls.Host,
+					HostUsername: username,
+					EmailHash:    strings.TrimSpace(row.EmailHash),
+					Status:       store.RosterInvited,
+				}
+				if err := s.store.CreateRosterEntry(r.Context(), re); err != nil {
+					res.Status, res.Error = "error", err.Error()
+				} else {
+					res.Status, res.Entry = "created", re
+				}
+			}
+		}
+
+		switch res.Status {
+		case "created":
+			created++
+			seen[username] = true
+		case "already_present":
+			alreadyPresent++
+			seen[username] = true
+		default:
+			failed++
+		}
+		results = append(results, res)
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"created":         created,
+		"already_present": alreadyPresent,
+		"errors":          failed,
+		"results":         results,
+	})
 }
 
 func (s *Server) handleCreateAssignment(w http.ResponseWriter, r *http.Request) {

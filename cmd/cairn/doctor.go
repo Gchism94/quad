@@ -55,6 +55,7 @@ var knownEnvVars = []string{
 	"CAIRN_ADMIN_USERS", "CAIRN_AUTH_DISABLED", "CAIRN_COOKIE_SECURE",
 	"CAIRN_GRADER", "CAIRN_GRADER_RUNTIME", "CAIRN_GRADER_IMAGE",
 	"CAIRN_GRADER_RESTRICTED_NETWORK", "CAIRN_GRADER_USER",
+	"CAIRN_GRADER_ISOLATION",
 	"CAIRN_GIT_CLONE_TOKEN",
 	"CAIRN_LISTEN_ADDR", "CAIRN_WEB_DIR", "CAIRN_WEBHOOK_BASE_URL",
 	"CAIRN_GHC_TOKEN",
@@ -172,10 +173,11 @@ func buildDoctorReport(ctx context.Context, verifyHosts bool) doctor.Report {
 	}))
 
 	rep.AddAll(doctor.CheckGrading(ctx, doctor.GradingConfig{
-		Mode:    os.Getenv("CAIRN_GRADER"),
-		Runtime: getenvDefault("CAIRN_GRADER_RUNTIME", "docker"),
-		Image:   os.Getenv("CAIRN_GRADER_IMAGE"),
-		WorkDir: os.Getenv("TMPDIR"),
+		Mode:      os.Getenv("CAIRN_GRADER"),
+		Runtime:   getenvDefault("CAIRN_GRADER_RUNTIME", "docker"),
+		Isolation: os.Getenv("CAIRN_GRADER_ISOLATION"),
+		Image:     os.Getenv("CAIRN_GRADER_IMAGE"),
+		WorkDir:   os.Getenv("TMPDIR"),
 	}, execCommander{}, osProbeFS{})...)
 
 	return rep

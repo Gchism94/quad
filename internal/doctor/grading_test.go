@@ -21,12 +21,19 @@ type fakeCommander struct {
 	// runOut is what a `run` invocation prints; runErr fails it.
 	runOut string
 	runErr error
+	// infoOut is what `info --format {{.Runtimes}}` prints; infoErr fails it.
+	// Empty infoOut stands for a daemon with no runsc registered.
+	infoOut string
+	infoErr error
 }
 
 func (f *fakeCommander) Run(_ context.Context, name string, args ...string) (string, error) {
 	f.calls = append(f.calls, append([]string{name}, args...))
 	if len(args) > 0 && args[0] == "version" {
 		return f.version, f.versionErr
+	}
+	if len(args) > 0 && args[0] == "info" {
+		return f.infoOut, f.infoErr
 	}
 	return f.runOut, f.runErr
 }

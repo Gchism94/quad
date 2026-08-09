@@ -230,6 +230,64 @@ produce empty checkouts, so treat it as blocking.
 > you trust should be in `CAIRN_ADMIN_USERS`. Grading containers themselves are
 > tightly confined; the socket is the part to think about.
 
+### Isolation tiers — adding a kernel boundary
+
+The hardening above is real, but a plain container **shares the host kernel**.
+Every syscall student code makes is handled by the same kernel running your
+server, and the container runtime is itself attack surface: `runc`
+CVE-2024-21626 ("Leaky Vessels") reached the host root through a leaked
+`/proc/self/fd` handle, and the November 2025 trio (CVE-2025-31133, -52565,
+-52881) defeated masked paths and, in some configurations, AppArmor/SELinux.
+Hardening flags raise the cost of an escape; they do not make one impossible.
+
+`CAIRN_GRADER_ISOLATION` chooses what sits underneath those flags:
+
+| Value | Boundary | When |
+|---|---|---|
+| `shared` (default, or unset) | Hardened container, **host kernel shared** | Trusted cohort; no gVisor available |
+| `gvisor` | [gVisor](https://gvisor.dev) (`runsc`) userspace kernel — the sandbox sees ~53 host syscalls | Untrusted or unknown submissions |
+
+Nothing changes for an existing deployment: leaving it unset is exactly the
+behaviour Cairn has always had. The tier is opt-in.
+
+**Installing gVisor**, then telling Cairn to use it:
+
+```sh
+# on the Docker host — see https://gvisor.dev/docs/user_guide/install/
+sudo runsc install                 # registers runsc in /etc/docker/daemon.json
+sudo systemctl restart docker
+docker info --format '{{.Runtimes}}'   # runsc must appear here
+```
+
+```sh
+CAIRN_GRADER_ISOLATION=gvisor
+```
+
+```sh
+docker compose up -d
+docker compose exec cairn cairn doctor    # the "grading isolation" line
+```
+
+**A requested tier is honoured or refused — never quietly downgraded.** If you
+set `gvisor` and `runsc` is not registered with the daemon, Cairn does not fall
+back to a shared-kernel container: `cairn doctor` fails with the fix, and
+grading refuses to run. A deployment that believes it has a kernel boundary and
+does not is worse off than one that never asked for it.
+
+**The honest performance cost.** CPU-bound work — the common case for
+autograding — runs at roughly native speed. Syscall- and I/O-heavy work runs
+**2–10× slower**, so a grading run that spawns many processes, writes many
+files, or installs packages at test time will feel it. Measure your own specs
+before mandating this across a course; the cost is real and worth knowing
+rather than discovering at a deadline.
+
+gVisor does not defend against bugs in gVisor's own Sentry, or against
+microarchitectural side channels. It is a strong boundary, not a perfect one.
+The tier vocabulary and the rationale behind it come from the platform's
+isolation-tier spec (`outfitter/specs/08-isolation-tiers.md`), where this tier
+is called `T-standard`; Cairn uses the plainer `shared`/`gvisor` names because
+`T-standard` is the platform's recommended default, not Cairn's current one.
+
 ---
 
 ## Day-two operations

@@ -324,11 +324,21 @@ func graderFromEnv(st store.Store) provisioning.Grader {
 		runtime := getenvDefault("CAIRN_GRADER_RUNTIME", "docker")
 		cr := &grading.ContainerRunner{
 			Runtime:           runtime,
+			Isolation:         grading.IsolationTier(os.Getenv("CAIRN_GRADER_ISOLATION")),
 			DefaultImage:      os.Getenv("CAIRN_GRADER_IMAGE"),
 			RestrictedNetwork: os.Getenv("CAIRN_GRADER_RESTRICTED_NETWORK"),
 			User:              os.Getenv("CAIRN_GRADER_USER"),
 		}
-		log.Printf("grading: container runner (runtime=%s image=%q)", runtime, cr.DefaultImage)
+		// Fail at startup rather than at the first grading run: a typo in the
+		// tier name must never resolve to "run with a weaker boundary".
+		if err := cr.ValidateIsolation(); err != nil {
+			log.Fatalf("CAIRN_GRADER_ISOLATION: %v", err)
+		}
+		log.Printf("grading: container runner (runtime=%s isolation=%s image=%q)",
+			runtime, cr.EffectiveIsolation(), cr.DefaultImage)
+		if cr.EffectiveIsolation() == grading.IsolationShared {
+			log.Printf("note: grading containers share the host kernel; set CAIRN_GRADER_ISOLATION=gvisor for a kernel boundary (see docs/deploy.md)")
+		}
 		if cr.DefaultImage == "" {
 			log.Printf("note: CAIRN_GRADER_IMAGE is unset; grading requires each spec to set its own image")
 		}

@@ -40,11 +40,12 @@ import (
 // Setup-level changes persist between steps only within the mounted checkout, so
 // the toolchain belongs in the image; setup should build into the working tree.
 type ContainerRunner struct {
-	Runtime           string   // "docker" (default) or "podman"
-	DefaultImage      string   // used when a spec sets no image
-	RestrictedNetwork string   // runtime network name for NetworkRestricted
-	User              string   // --user value; default is the server's own uid:gid (set CAIRN_GRADER_USER to override)
-	ExtraArgs         []string // additional runtime args (advanced)
+	Runtime           string        // "docker" (default) or "podman"
+	Isolation         IsolationTier // "" / "shared" (default) or "gvisor"; see IsolationTier
+	DefaultImage      string        // used when a spec sets no image
+	RestrictedNetwork string        // runtime network name for NetworkRestricted
+	User              string        // --user value; default is the server's own uid:gid (set CAIRN_GRADER_USER to override)
+	ExtraArgs         []string      // additional runtime args (advanced)
 
 	DefaultTimeout  time.Duration // per-step fallback; default 30s
 	DefaultMemoryMB int           // default 512
@@ -52,6 +53,72 @@ type ContainerRunner struct {
 	DefaultPids     int           // default 256
 
 	exec commandRunner // injected in tests; nil -> real exec
+}
+
+// IsolationTier selects the kernel boundary under the container. The hardening
+// flags above (T3) are applied identically at every tier; this chooses what sits
+// underneath them (T2).
+//
+// The names are Cairn's own rather than the platform spec's `T-standard`/
+// `T-strong` labels. The spec calls gVisor "T-standard" because it is the
+// platform's *recommended* default — but it is not Cairn's default, and reusing
+// the label here would tell an operator reading this struct that they already
+// have a kernel boundary when they do not. The mapping is recorded in
+// docs/deploy.md.
+type IsolationTier string
+
+const (
+	// IsolationShared is today's behaviour and the default: an ordinary OCI
+	// container sharing the host kernel. Strong T3 hardening, no T2 boundary —
+	// a kernel or runtime vulnerability (runc CVE-2024-21626 and the November
+	// 2025 procfs trio, for example) is reachable from student code.
+	IsolationShared IsolationTier = "shared"
+
+	// IsolationGVisor runs the container under gVisor (runsc), a userspace
+	// kernel that confines the sandbox to roughly 53 host syscalls. Opt-in:
+	// runsc must be installed and registered with the runtime daemon.
+	IsolationGVisor IsolationTier = "gvisor"
+)
+
+// gvisorRuntimeName is the OCI runtime `runsc` registers itself as.
+const gvisorRuntimeName = "runsc"
+
+// resolve returns the tier to use, or an error for an unrecognised value.
+//
+// An unknown tier is an error rather than a fallback to the default. That is the
+// whole point of this type: a deployment that asks for a boundary it does not get
+// is worse off than one that never asked, because it believes it is protected.
+func (t IsolationTier) resolve() (IsolationTier, error) {
+	switch t {
+	case "", IsolationShared:
+		return IsolationShared, nil
+	case IsolationGVisor:
+		return IsolationGVisor, nil
+	default:
+		return "", fmt.Errorf(
+			"unknown isolation tier %q: valid values are %q (default, shared host kernel) and %q (gVisor/runsc kernel boundary)",
+			string(t), string(IsolationShared), string(IsolationGVisor))
+	}
+}
+
+// ValidateIsolation reports whether the configured tier is a recognised value.
+// Callers that construct a runner from configuration should call this at startup
+// so a typo fails immediately rather than at the first grading run.
+func (r *ContainerRunner) ValidateIsolation() error {
+	_, err := r.Isolation.resolve()
+	return err
+}
+
+// EffectiveIsolation is the tier this runner will actually use, with the empty
+// value resolved to the default. It reports IsolationShared for an invalid
+// value; call ValidateIsolation to detect that case rather than inferring it
+// from this result.
+func (r *ContainerRunner) EffectiveIsolation() IsolationTier {
+	tier, err := r.Isolation.resolve()
+	if err != nil {
+		return IsolationShared
+	}
+	return tier
 }
 
 // NewContainerRunner returns a ContainerRunner with the given default image.
@@ -187,7 +254,11 @@ func (r *ContainerRunner) resolveLimits(spec gradingspec.Spec, test *gradingspec
 }
 
 // buildRunArgs constructs the runtime "run" arguments for one command.
-func (r *ContainerRunner) buildRunArgs(image, command string, lim resolvedLimits, mountDir, name string) []string {
+//
+// tier must already be resolved (see IsolationTier.resolve); passing an
+// unvalidated value here would be the silent-downgrade bug this design exists to
+// prevent, so Run resolves once up front and fails before reaching this point.
+func (r *ContainerRunner) buildRunArgs(image, command string, lim resolvedLimits, mountDir, name string, tier IsolationTier) []string {
 	mem := strconv.Itoa(lim.memoryMB) + "m"
 	args := []string{
 		"run", "--rm", "--name", name,
@@ -203,6 +274,11 @@ func (r *ContainerRunner) buildRunArgs(image, command string, lim resolvedLimits
 		"-v", mountDir + ":/work",
 		"--workdir", "/work",
 		"--user", r.user(),
+	}
+	// Appended only for a non-default tier, so the default path's argument list
+	// stays byte-identical to what it was before isolation tiers existed.
+	if tier == IsolationGVisor {
+		args = append(args, "--runtime", gvisorRuntimeName)
 	}
 	switch lim.network {
 	case gradingspec.NetworkRestricted:
@@ -229,12 +305,20 @@ func (r *ContainerRunner) Run(ctx context.Context, spec gradingspec.Spec, dir st
 		return Result{}, errors.New("container runner: no image (set the spec's image or a default image)")
 	}
 
+	// Resolve the isolation tier before running anything. A misconfigured tier
+	// must stop the run here: grading student code under a weaker boundary than
+	// the operator asked for is a worse outcome than not grading at all.
+	tier, err := r.Isolation.resolve()
+	if err != nil {
+		return Result{}, fmt.Errorf("container runner: %w", err)
+	}
+
 	res := Result{MaxScore: spec.MaxScore()}
 	cr := r.runner()
 	rt := r.runtime()
 
 	for _, step := range spec.Setup {
-		out, err := r.exec1(ctx, cr, rt, image, step, r.resolveLimits(spec, nil), dir)
+		out, err := r.exec1(ctx, cr, rt, image, step, r.resolveLimits(spec, nil), dir, tier)
 		if err != nil {
 			return Result{}, fmt.Errorf("container runner: %w", err)
 		}
@@ -248,7 +332,7 @@ func (r *ContainerRunner) Run(ctx context.Context, spec gradingspec.Spec, dir st
 	}
 
 	for _, t := range spec.Tests {
-		out, err := r.exec1(ctx, cr, rt, image, t.Run, r.resolveLimits(spec, &t), dir)
+		out, err := r.exec1(ctx, cr, rt, image, t.Run, r.resolveLimits(spec, &t), dir, tier)
 		if err != nil {
 			return Result{}, fmt.Errorf("container runner: %w", err)
 		}
@@ -295,9 +379,9 @@ func (r *ContainerRunner) Run(ctx context.Context, spec gradingspec.Spec, dir st
 // exec1 runs a single command in a fresh container, killing a runaway container
 // best-effort if the step times out (the runtime CLI dying does not stop the
 // container the daemon owns).
-func (r *ContainerRunner) exec1(ctx context.Context, cr commandRunner, rt, image, command string, lim resolvedLimits, dir string) (cmdResult, error) {
+func (r *ContainerRunner) exec1(ctx context.Context, cr commandRunner, rt, image, command string, lim resolvedLimits, dir string, tier IsolationTier) (cmdResult, error) {
 	name := "cairn-grade-" + id.New()
-	out, err := cr.run(ctx, rt, r.buildRunArgs(image, command, lim, dir, name), lim.timeout)
+	out, err := cr.run(ctx, rt, r.buildRunArgs(image, command, lim, dir, name, tier), lim.timeout)
 	if err != nil {
 		return out, err
 	}

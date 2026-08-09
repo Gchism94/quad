@@ -19,6 +19,8 @@ type GradingConfig struct {
 	Mode string
 	// Runtime is the resolved container runtime binary ("docker" or "podman").
 	Runtime string
+	// Isolation is CAIRN_GRADER_ISOLATION: "", "shared", or "gvisor".
+	Isolation string
 	// Image is CAIRN_GRADER_IMAGE; may be empty if every spec sets its own.
 	Image string
 	// WorkDir is where grading checkouts are created (the effective TMPDIR).
@@ -79,6 +81,7 @@ func CheckGrading(ctx context.Context, cfg GradingConfig, cmd Commander, fsys Pr
 			"%s is not usable: %v", runtime, err))
 	}
 	out = append(out, okf(name, "%s server %s", runtime, strings.TrimSpace(version)))
+	out = append(out, checkIsolationTier(ctx, cfg, runtime, cmd))
 
 	if cfg.Image == "" {
 		out = append(out, warnf(name,
@@ -89,6 +92,61 @@ func CheckGrading(ctx context.Context, cfg GradingConfig, cmd Commander, fsys Pr
 
 	out = append(out, checkMountRoundTrip(ctx, cfg, runtime, cmd, fsys))
 	return out
+}
+
+// Isolation tiers, mirroring CAIRN_GRADER_ISOLATION in internal/grading.
+const (
+	IsolationShared = "shared"
+	IsolationGVisor = "gvisor"
+)
+
+// checkIsolationTier reports the kernel boundary under grading containers.
+//
+// The default tier is an informational line, not a warning: sharing the host
+// kernel is the documented default and a deployment that has not opted in is not
+// misconfigured. A *requested* tier that is unavailable is a failure, because
+// grading would otherwise run with a weaker boundary than the operator asked for.
+func checkIsolationTier(ctx context.Context, cfg GradingConfig, runtime string, cmd Commander) Result {
+	const name = "grading isolation"
+
+	switch cfg.Isolation {
+	case "", IsolationShared:
+		return okf(name,
+			"shared host kernel (default) — hardened container, no kernel boundary; "+
+				"set CAIRN_GRADER_ISOLATION=gvisor to add one (see docs/deploy.md)")
+
+	case IsolationGVisor:
+		// Ask the daemon what runtimes it has registered. Checking for the runsc
+		// binary on PATH would not be enough: Cairn may run in a container while
+		// the daemon lives on the host, so what matters is what the *daemon* can
+		// select, not what this filesystem happens to contain.
+		out, err := cmd.Run(ctx, runtime, "info", "--format", "{{.Runtimes}}")
+		if err != nil {
+			return failf(name, gvisorFix(runtime),
+				"cannot ask %s which runtimes it has registered: %v", runtime, err)
+		}
+		if !strings.Contains(out, "runsc") {
+			return failf(name, gvisorFix(runtime),
+				"CAIRN_GRADER_ISOLATION=gvisor but %s has no \"runsc\" runtime registered — "+
+					"grading would refuse to run rather than fall back to a weaker boundary",
+				runtime)
+		}
+		return okf(name, "gVisor (runsc) registered with %s — grading runs behind a userspace kernel", runtime)
+
+	default:
+		return failf(name,
+			"set CAIRN_GRADER_ISOLATION to \""+IsolationShared+"\" or \""+IsolationGVisor+"\", or unset it for the default",
+			"unknown CAIRN_GRADER_ISOLATION value %q", cfg.Isolation)
+	}
+}
+
+func gvisorFix(runtime string) string {
+	return "install gVisor and register it with " + runtime + ", or unset CAIRN_GRADER_ISOLATION to\n" +
+		"accept the shared-kernel default:\n" +
+		"  https://gvisor.dev/docs/user_guide/install/\n" +
+		"  sudo " + runtime + " info --format '{{.Runtimes}}'   # confirm runsc appears\n" +
+		"on Docker, `runsc install` writes the runtime into /etc/docker/daemon.json;\n" +
+		"restart the daemon afterwards (sudo systemctl restart docker)"
 }
 
 // runtimeFix turns the runtime's own error into the specific thing to change.

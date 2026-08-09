@@ -66,7 +66,18 @@ An optional, non-default backfill path (retroactive autograding, then
 re-import) is documented in `docs/migrate-from-github-classroom.md` §8 and
 `docs/ghc-import.md` for instructors who specifically want an autograded
 score — it computes a new score, not a recovery of an original one, and most
-instructors migrating a finished course won't want it. Not pilot-blocking.
+instructors migrating a finished course won't want it.
+
+**That backfill path is untested.** Greg: Classroom has a known,
+long-standing problem computing/recording grades after a deadline has
+passed, which is why grades were rarely present at all — so retroactive
+autograding may hit the same failure post-deadline rather than simply
+working. `docs/prompts/CC-CA4-retroactive-autograding-poc.md` is queued to
+run it for real against a small sample (2-3 repos) of one of Greg's real
+past-deadline classrooms, plus a control check against a classroom that
+already has real grades (to confirm import fidelity on data known to exist,
+which CC-CA2 never got to check). The docs get corrected with real evidence
+once that runs. Not pilot-blocking.
 
 ## UX polish — queued 2026-08-09, from an instructor/student review
 Not pilot-blocking, but cheap and worth doing before the pilot term starts.

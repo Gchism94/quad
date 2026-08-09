@@ -92,28 +92,57 @@ matched exactly** on `score`, `max_score`, `breakdown.raw`, and
 ## UX polish — queued 2026-08-09, from an instructor/student review
 Not pilot-blocking, but cheap and worth doing before the pilot term starts.
 See `docs/prompts/CC-CA3-invite-link-and-student-landing.md`.
-- [ ] Copy-invite-link action on each assignment card (the join URL is a real
+- [x] Copy-invite-link action on each assignment card (the join URL is a real
   route already — `/assignments/{id}/accept` — but nothing in the UI surfaces
-  it, so instructors hand-build it)
-- [ ] Stop serving the instructor login screen at `/` to a student who is
+  it, so instructors hand-build it) *(CC-CA3, `internal/api/server.go`'s
+  `studentRootRedirect` + `AssignmentCard.tsx`'s copy-invite button)*
+- [x] Stop serving the instructor login screen at `/` to a student who is
   already signed in. Confirmed in code: a valid student session 401s against
   `/auth/me` (operator-only), so the SPA shows "sign in" to someone already
-  authenticated, with no link to `/me` or `/student/login`.
+  authenticated, with no link to `/me` or `/student/login`. *(CC-CA3, scoped
+  to exactly `r.URL.Path == "/"` so asset/SPA sub-routes are untouched)*
 
 ## Phase 3 — Ephemeral LMS roster agent
 Split 2026-08-09 per Greg: the agent is the goal, but it must not be the only
 path — not every LMS will be reachable (GitHub Classroom itself never
 supported Brightspace), so the manual fallback ships first and independently.
-- [ ] **CC-CA6 — bulk manual roster entry** (the guaranteed fallback). Single-add
+- [x] **CC-CA6 — bulk manual roster entry** (the guaranteed fallback). Single-add
   already exists (`POST /classrooms/{id}/roster`, `RosterPanel.tsx`) but only
   takes one student at a time — not usable for a real class roster. Ships
-  first; has no dependency on CC-CA7.
-- [ ] **CC-CA7 — the LMS-roster agent itself.** Open, auditable local agent
+  first; has no dependency on CC-CA7. *(`POST /classrooms/{id}/roster/bulk`,
+  idempotent, per-row results, always-200; client-side email hashing in
+  `web/src/roster-parse.ts`)*
+- [x] **CC-CA7 — the LMS-roster agent itself.** Open, auditable local agent
   (CLI first; browser-extension DOM-scrape reserved for LMSs with no
   self-serve API token — verify each LMS's actual token-access model against
   current docs before assuming one, per CLAUDE.md's platform invariant).
   Local-only name↔username matching; server receives username (+ email hash)
   only via CC-CA6's bulk endpoint. Depends on CC-CA6 landing first.
+  *(`internal/rosteragent`, `cairn roster pull`; Brightspace CSV export
+  primary, Valence API secondary — live-verified against a real course that
+  the admin-gated API path is correctly gated, per §1 of
+  `docs/lms-roster-agent.md`. Known follow-up, not yet fixed: a same-name
+  collision in `MatchRoster` correctly falls to "needs confirmation" rather
+  than guessing, but has no dedicated resolution UI yet — worth a small
+  prompt if the pilot section turns out to have duplicate names.)*
+
+## Hardening and CI — 2026-08-09
+- [x] **CC-CA1 — gVisor isolation tier for grading.** `CAIRN_GRADER_ISOLATION`
+  (`shared` default / `gvisor`), refused rather than silently downgraded when
+  unavailable; `cairn doctor` checks the daemon's registered runtimes.
+  Known follow-ups, not yet fixed: `ExtraArgs` can still smuggle in a
+  `--runtime` override, bypassing validation; the doctor check's
+  runtime-list query assumes Docker's output shape and likely misreads a
+  podman deployment (fails closed either way, so not a safety gap, just an
+  incomplete one).
+- [x] **CC-CA8 — frontend test runner.** Vitest stood up; backfilled the
+  `roster-parse.ts` and `api.inviteUrl` tests that CC-CA3 and CC-CA6 could
+  only verify by hand. No CI existed yet to run them automatically — see
+  CC-CA9.
+- [x] **CC-CA9 — CI.** `.github/workflows/ci.yml`: Go (`build`, `vet`,
+  `gofmt`, `test -race`) and frontend (`typecheck`, `test`, `build`) on
+  every push/PR. Not yet required on `main` branch protection — recommended
+  once it's gone green on a few real PRs.
 
 ## Phase 4 — Hosted + LMS integration *(stretch)*
 - [ ] Multi-tenant hosted offering (scoped data processor)

@@ -30,7 +30,17 @@ vendor's claimed capability, verify against the live docs/service. If
 Brightspace's API isn't realistically reachable by an instructor without a
 separate institutional approval process, DOM-scrape is not a fallback for
 Brightspace — it is the primary path, and the prompt output should say that
-plainly rather than treating both LMSs as symmetric.*
+plainly rather than treating both LMSs as symmetric.
+
+**Confirmed 2026-08-09: the actual pilot course runs on Brightspace.** Build
+the Brightspace connector first, not Canvas — Canvas was the easy
+illustrative example, Brightspace is the one that has to work for this
+pilot. Still do the §1 research rather than assuming DOM-scrape is required
+— Brightspace's Valence API access model may have changed, or the
+institution may already have an app-registration path — but budget for
+DOM-scrape being the real answer, since that is the likelier outcome per
+the trust-model difference from Canvas, and design the connector interface
+so that isn't a late surprise.*
 
 ## 1. Read first
 
@@ -57,10 +67,10 @@ browser extension speculatively for an LMS that turns out to have a fine
 API path — that's wasted surface area and more code review burden for
 something handling roster data.
 
-State which target LMS(s) the actual pilot course uses before scoping
-connectors further — building a Moodle connector nobody needs yet is waste;
-the ROADMAP's three named LMSs (Canvas, Moodle, Brightspace) are the
-long-run target, not all three at once for this prompt.
+The pilot course runs on **Brightspace** — build that connector for this
+prompt. Canvas and Moodle are the long-run ROADMAP target (all three named
+there) but building either now, before Brightspace works, is waste against
+what this pilot actually needs.
 
 ## 3. Connector interface
 

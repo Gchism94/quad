@@ -101,9 +101,19 @@ See `docs/prompts/CC-CA3-invite-link-and-student-landing.md`.
   authenticated, with no link to `/me` or `/student/login`.
 
 ## Phase 3 — Ephemeral LMS roster agent
-- [ ] Open, auditable local agent (browser extension / CLI)
-- [ ] Instructor-token API pull (Canvas/Moodle/Brightspace); DOM scrape fallback
-- [ ] Local-only name↔username matching; server receives username (+ email hash) only
+Split 2026-08-09 per Greg: the agent is the goal, but it must not be the only
+path — not every LMS will be reachable (GitHub Classroom itself never
+supported Brightspace), so the manual fallback ships first and independently.
+- [ ] **CC-CA6 — bulk manual roster entry** (the guaranteed fallback). Single-add
+  already exists (`POST /classrooms/{id}/roster`, `RosterPanel.tsx`) but only
+  takes one student at a time — not usable for a real class roster. Ships
+  first; has no dependency on CC-CA7.
+- [ ] **CC-CA7 — the LMS-roster agent itself.** Open, auditable local agent
+  (CLI first; browser-extension DOM-scrape reserved for LMSs with no
+  self-serve API token — verify each LMS's actual token-access model against
+  current docs before assuming one, per CLAUDE.md's platform invariant).
+  Local-only name↔username matching; server receives username (+ email hash)
+  only via CC-CA6's bulk endpoint. Depends on CC-CA6 landing first.
 
 ## Phase 4 — Hosted + LMS integration *(stretch)*
 - [ ] Multi-tenant hosted offering (scoped data processor)

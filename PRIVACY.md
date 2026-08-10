@@ -115,19 +115,34 @@ provisions repositories, runs grading, and **exports** scores. Consequently:
 
 These are gaps, not decisions. Tracked in `data-destinations.md` §8.
 
-- **No retention or purge path exists.** The repository was searched on
-  2026-07-29: there is no retention schedule, no purge, and no deletion path
-  anywhere in the codebase. Grades accumulate indefinitely. The intended policy
-  is purge-after-confirmed-export; the implementation is outstanding.
-- **No roster-entry deletion** with dependent rows. Required to support a
-  removal request even though the LMS is the record of truth.
-- **`README.md`'s and the white paper's "never student records" phrasing** is
-  slightly ahead of the schema while the `grades` table retains scores.
-  Implementing purge-after-export makes the claim exact; until then the
-  accurate phrasing is "no student names, SIS IDs, or plaintext emails."
-- **Deployment destination for the Fall 2026 pilot is undecided** between
-  institutional and self-stewarded hosting. This blocks the pilot and is
-  `data-destinations.md` §8 item 1.
+- ~~No retention or purge path exists.~~ **Closed (CC-CA15, 2026-08-10).**
+  `POST /classrooms/{id}/grades/confirm-export` starts a per-grade retention
+  clock explicitly — never the CSV download itself — and a daily purge job
+  deletes a grade (and its `grading_runs` row, once nothing else references
+  it) once `CAIRN_GRADE_RETENTION_DAYS` has elapsed since confirmation. A
+  grade never confirmed exported is never purged, regardless of age. **Still
+  a real gap in practice, not just in code:** `CAIRN_GRADE_RETENTION_DAYS`
+  has no default — until it's set on a deployment, purge is a no-op and
+  `cairn doctor` warns accordingly. The day count itself is a policy choice
+  for Greg/counsel (`DESIGN.md` §10), not one the code makes permanently.
+- ~~No roster-entry deletion~~ **Closed (CC-CA15).** `DELETE
+  /classrooms/{id}/roster/{entry_id}` removes the roster entry and every
+  dependent submission, grade, and grading run — an irreversible erasure,
+  distinct from the `RosterRemoved` lifecycle status. No configuration
+  needed; available on every deployment.
+- **`README.md`'s and the white paper's "never student records" phrasing**
+  is now exact **once a deployment actually confirms exports and sets
+  `CAIRN_GRADE_RETENTION_DAYS`** — the code no longer makes it structurally
+  false, but an unconfigured deployment still accumulates grades
+  indefinitely in practice. Keep the accurate phrasing ("no student names,
+  SIS IDs, or plaintext emails") for any deployment that hasn't turned
+  retention on yet.
+- **Deployment destination for the Fall 2026 pilot: D2 for now** (Greg,
+  2026-08-10) — self-stewarded infrastructure, not yet institutional. A UITS
+  conversation about D1 and whether it triggers UA's third-party review
+  (`data-destinations.md` §8 items 1–2) is a real possibility Greg intends to
+  raise, but isn't imminent — treat the destination as a working decision,
+  not a closed one.
 
 ## Compliance posture
 

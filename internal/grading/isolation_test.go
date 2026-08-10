@@ -195,6 +195,113 @@ func TestExtraArgsRuntimeRefusedEvenWhenItAgrees(t *testing.T) {
 	}
 }
 
+// Every flag in the deny-list, in both the separate-value and --flag=value
+// forms, across every isolation tier. Each of these overrides a hardening
+// decision buildRunArgs already makes; the override behaviour was confirmed
+// against a real Docker daemon before the flag was denied.
+func TestExtraArgsDenyListCoversEveryHardeningFlag(t *testing.T) {
+	// value is what a plausible attacker or careless operator would pass.
+	denied := map[string]string{
+		"--cap-add":      "SYS_ADMIN",
+		"--user":         "0:0",
+		"--network":      "bridge",
+		"--memory":       "4g",
+		"--memory-swap":  "8g",
+		"--pids-limit":   "8192",
+		"--cpus":         "8",
+		"--security-opt": "seccomp=unconfined",
+		"--read-only":    "false",
+		"--runtime":      "runc",
+	}
+
+	for _, tier := range []IsolationTier{"", IsolationShared, IsolationGVisor} {
+		for flag, value := range denied {
+			forms := [][]string{
+				{flag, value},        // separate value
+				{flag + "=" + value}, // joined
+				// Buried after something legitimate, so the check cannot be
+				// fooled by position.
+				{"--label", "course=cs101", flag, value},
+			}
+			for _, extra := range forms {
+				r := &ContainerRunner{Isolation: tier, ExtraArgs: extra}
+				err := r.ValidateIsolation()
+				if err == nil {
+					t.Errorf("tier %q: ExtraArgs %q was accepted; it overrides the runner's own hardening",
+						tier, extra)
+					continue
+				}
+				if !strings.Contains(err.Error(), "ExtraArgs") {
+					t.Errorf("tier %q extra %q: message does not mention ExtraArgs: %v", tier, extra, err)
+				}
+			}
+		}
+	}
+
+	// --privileged is a bare boolean with no value form.
+	for _, tier := range []IsolationTier{"", IsolationShared, IsolationGVisor} {
+		r := &ContainerRunner{Isolation: tier, ExtraArgs: []string{"--privileged"}}
+		if err := r.ValidateIsolation(); err == nil {
+			t.Errorf("tier %q: --privileged was accepted; it disables the whole confinement layer", tier)
+		}
+	}
+}
+
+// The deny-list must name the flag and say what it would undo — an operator who
+// hits this needs to know why, not just that it was refused.
+func TestDeniedExtraArgErrorNamesTheFlagAndTheReason(t *testing.T) {
+	r := &ContainerRunner{ExtraArgs: []string{"--privileged"}}
+	err := r.ValidateIsolation()
+	if err == nil {
+		t.Fatal("expected --privileged to be refused")
+	}
+	for _, want := range []string{"--privileged", "confinement"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("message missing %q: %v", want, err)
+		}
+	}
+}
+
+// Flags with a legitimate non-hardening use must keep working. Denying these
+// would make ExtraArgs useless without making grading safer.
+func TestLegitimateExtraArgsAreNotDenied(t *testing.T) {
+	allowed := [][]string{
+		{"--dns", "10.0.0.1"},
+		{"--label", "course=cs101"},
+		{"--add-host", "mirror.internal:10.0.0.5"},
+		{"--env", "PIP_INDEX_URL=https://mirror.internal/simple"},
+		// An extra scratch mount beyond the runner's own /tmp.
+		{"--tmpfs", "/scratch:rw,size=32m"},
+		// Read-only reference data mounted alongside the checkout.
+		{"--volume", "/srv/datasets:/data:ro"},
+		{"--hostname", "grader"},
+	}
+	for _, extra := range allowed {
+		for _, tier := range []IsolationTier{"", IsolationShared, IsolationGVisor} {
+			r := &ContainerRunner{Isolation: tier, ExtraArgs: extra}
+			if err := r.ValidateIsolation(); err != nil {
+				t.Errorf("tier %q: legitimate ExtraArgs %q was rejected: %v", tier, extra, err)
+			}
+		}
+	}
+}
+
+// A denied flag's name appearing inside someone else's *value* must not trip
+// the check — only an actual flag position counts.
+func TestDenyListDoesNotMatchInsideValues(t *testing.T) {
+	benign := [][]string{
+		{"--label", "note=do-not-use---privileged-here"},
+		{"--env", "DOCS=--cap-add is denied"},
+		{"--label", "policy=--read-only"},
+	}
+	for _, extra := range benign {
+		r := &ContainerRunner{ExtraArgs: extra}
+		if err := r.ValidateIsolation(); err != nil {
+			t.Errorf("ExtraArgs %q was rejected for mentioning a flag in a value: %v", extra, err)
+		}
+	}
+}
+
 // ExtraArgs that do not touch the runtime remain allowed — this fix must not
 // turn ExtraArgs into a dead field.
 func TestExtraArgsWithoutRuntimeStillValidates(t *testing.T) {

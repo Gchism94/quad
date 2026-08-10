@@ -240,6 +240,114 @@ func TestMatchSeveralNearMatchesIsAmbiguous(t *testing.T) {
 	}
 }
 
+// A middle initial that normalisation would otherwise discard is enough to
+// narrow a tie to one candidate — but only to MatchNeedsConfirm. One letter
+// agreeing is weaker evidence than a whole name agreeing, so the instructor
+// still confirms.
+func TestMiddleInitialNarrowsATieToOneCandidate(t *testing.T) {
+	candidates := []Candidate{
+		{Username: "jadoe", FullName: "Jane A. Doe"},
+		{Username: "jbdoe", FullName: "Jane B. Doe"},
+	}
+
+	// "Jane A Doe" (no period) is the case that tied before this change:
+	// nameParts drops the single-character token, so both candidates matched.
+	for _, lmsName := range []string{"Jane A Doe", "Doe, Jane A", "jane a doe"} {
+		t.Run(lmsName, func(t *testing.T) {
+			got := MatchRoster([]RosterRow{{Name: lmsName}}, candidates)[0]
+
+			if got.Status != MatchNeedsConfirm {
+				t.Fatalf("status = %q, want %q (narrowed, not resolved outright); why: %s",
+					got.Status, MatchNeedsConfirm, got.Why)
+			}
+			if got.Username != "jadoe" {
+				t.Errorf("username = %q, want jadoe — the initial should pick A over B", got.Username)
+			}
+			if got.Status == MatchExact {
+				t.Error("an initial must never promote a match to exact")
+			}
+		})
+	}
+}
+
+// The narrowing must pick the right one, not merely pick.
+func TestMiddleInitialPicksTheMatchingCandidate(t *testing.T) {
+	candidates := []Candidate{
+		{Username: "jadoe", FullName: "Jane A. Doe"},
+		{Username: "jbdoe", FullName: "Jane B. Doe"},
+	}
+	got := MatchRoster([]RosterRow{{Name: "Jane B Doe"}}, candidates)[0]
+	if got.Username != "jbdoe" {
+		t.Errorf("username = %q, want jbdoe", got.Username)
+	}
+	if got.Status != MatchNeedsConfirm {
+		t.Errorf("status = %q, want %q", got.Status, MatchNeedsConfirm)
+	}
+}
+
+// No initial in the LMS row means nothing to narrow with: the tie stands
+// exactly as CC-CA10 left it.
+func TestNoInitialLeavesTheTieAmbiguous(t *testing.T) {
+	candidates := []Candidate{
+		{Username: "jadoe", FullName: "Jane A. Doe"},
+		{Username: "jbdoe", FullName: "Jane B. Doe"},
+	}
+	got := MatchRoster([]RosterRow{{Name: "Jane Doe"}}, candidates)[0]
+	if got.Status != MatchAmbiguous {
+		t.Errorf("status = %q, want %q when there is no initial to narrow with", got.Status, MatchAmbiguous)
+	}
+	if len(got.Candidates) != 2 {
+		t.Errorf("candidates = %d, want both still offered", len(got.Candidates))
+	}
+}
+
+// Candidates sharing the same initial are not narrowed by it.
+func TestSharedInitialStillTies(t *testing.T) {
+	candidates := []Candidate{
+		{Username: "jadoe1", FullName: "Jane A. Doe"},
+		{Username: "jadoe2", FullName: "Jane A. Doe"},
+	}
+	got := MatchRoster([]RosterRow{{Name: "Jane A Doe"}}, candidates)[0]
+	if got.Status != MatchAmbiguous {
+		t.Errorf("status = %q, want %q when the initial does not discriminate", got.Status, MatchAmbiguous)
+	}
+	if len(got.Candidates) != 2 {
+		t.Errorf("candidates = %d, want both offered for selection", len(got.Candidates))
+	}
+}
+
+// An initial matching no candidate is information, not licence to guess.
+func TestContradictoryInitialStaysAmbiguous(t *testing.T) {
+	candidates := []Candidate{
+		{Username: "jadoe", FullName: "Jane A. Doe"},
+		{Username: "jbdoe", FullName: "Jane B. Doe"},
+	}
+	got := MatchRoster([]RosterRow{{Name: "Jane Z Doe"}}, candidates)[0]
+	if got.Status != MatchAmbiguous {
+		t.Errorf("status = %q, want %q — an initial matching nobody must not pick one",
+			got.Status, MatchAmbiguous)
+	}
+}
+
+// A narrowed match must round-trip into the payload like any other confirmed one.
+func TestNarrowedMatchRoundTripsIntoPayload(t *testing.T) {
+	candidates := []Candidate{
+		{Username: "jadoe", FullName: "Jane A. Doe"},
+		{Username: "jbdoe", FullName: "Jane B. Doe"},
+	}
+	m := MatchRoster([]RosterRow{{Name: "Jane A Doe", Email: "jane@example.edu"}}, candidates)[0]
+	req, skipped := BuildPayload("c1", []Match{m})
+	if len(skipped) != 0 {
+		t.Fatalf("narrowed match was skipped: %+v", skipped)
+	}
+	if len(req.Entries) != 1 || req.Entries[0].Username != "jadoe" {
+		t.Fatalf("entries = %+v, want one entry for jadoe", req.Entries)
+	}
+	if req.Entries[0].EmailHash != HashEmail("c1", "jane@example.edu") {
+		t.Error("email hash not carried through narrowing")
+	}
+}
+
 // Resolve turns a tie into a confirmed match, and refuses anything that was not
 // on the list — a mistyped answer must not enrol an unoffered student.
 func TestResolveAppliesOnlyAListedCandidate(t *testing.T) {

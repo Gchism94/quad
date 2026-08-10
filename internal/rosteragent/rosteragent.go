@@ -146,7 +146,10 @@ func matchOne(row RosterRow, candidates []Candidate) Match {
 	case 0:
 		// fall through to the weaker signals below
 	default:
-		return ambiguous(row, exactByName, "same name")
+		// Identical full names still get the initial tiebreak: two candidates
+		// can both equal the LMS name yet differ by a middle initial the
+		// normalisation kept, and narrowing beats making the instructor choose.
+		return narrowByInitials(row, exactByName, "same name")
 	}
 
 	var confirm []Candidate
@@ -169,8 +172,74 @@ func matchOne(row RosterRow, candidates []Candidate) Match {
 	case 1:
 		return Match{Row: row, Username: confirm[0].Username, Status: MatchNeedsConfirm, Why: "single near match — confirm before use"}
 	default:
-		return ambiguous(row, confirm, "several near matches")
+		return narrowByInitials(row, confirm, "several near matches")
 	}
+}
+
+// narrowByInitials tries to break a tie using the middle initials that
+// nameParts discards, and falls back to an ambiguous match when it cannot.
+//
+// The initials are dropped before comparison because "Jane A Doe" and "Jane
+// Doe" should still match each other — but that also makes "Jane A Doe" and
+// "Jane B Doe" indistinguishable, which is the tie this recovers.
+//
+// An initial narrows; it never promotes. A single survivor becomes
+// MatchNeedsConfirm, not MatchExact: one letter agreeing is weaker evidence
+// than a whole name agreeing, and the instructor still confirms. If the LMS row
+// has no initials, or more than one candidate shares them, the tie stands.
+func narrowByInitials(row RosterRow, tied []Candidate, reason string) Match {
+	want := initialsOf(row.Name)
+	if len(want) == 0 {
+		return ambiguous(row, tied, reason)
+	}
+
+	var survivors []Candidate
+	for _, c := range tied {
+		if c.FullName == "" {
+			continue
+		}
+		if sameInitials(want, initialsOf(c.FullName)) {
+			survivors = append(survivors, c)
+		}
+	}
+	if len(survivors) != 1 {
+		// Zero survivors means the initials contradict every candidate, which is
+		// information the instructor should see rather than a reason to guess;
+		// more than one means the initial did not discriminate.
+		return ambiguous(row, tied, reason)
+	}
+	return Match{
+		Row:      row,
+		Username: survivors[0].Username,
+		Status:   MatchNeedsConfirm,
+		Why:      reason + ", narrowed by initial — confirm before use",
+	}
+}
+
+// initialsOf returns the single-letter name parts, lowercased, in order. These
+// are exactly the tokens nameParts throws away.
+func initialsOf(name string) []string {
+	s := strings.ReplaceAll(normalizeName(name), ",", " ")
+	var out []string
+	for _, f := range strings.Fields(s) {
+		f = strings.TrimSuffix(f, ".")
+		if len(f) == 1 {
+			out = append(out, f)
+		}
+	}
+	return out
+}
+
+func sameInitials(a, b []string) bool {
+	if len(a) != len(b) || len(a) == 0 {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
 }
 
 // ambiguous builds a resolvable tie. The candidates are sorted by username so

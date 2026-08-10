@@ -112,27 +112,83 @@ func (r *ContainerRunner) ValidateIsolation() error {
 	return r.validateExtraArgs()
 }
 
-// validateExtraArgs refuses an ExtraArgs entry that selects the OCI runtime.
+// deniedExtraArg lists the flags ExtraArgs may not contain, each with the
+// hardening decision it would undo.
 //
-// ExtraArgs is appended after every flag buildRunArgs constructs, and the
-// runtime CLIs take the last occurrence of a repeated flag — so a --runtime
-// there does not merely duplicate the isolation tier's choice, it overrides it.
-// That would let configuration ask for the gVisor tier and silently run under a
-// weaker runtime, which is precisely the failure mode IsolationTier exists to
-// prevent.
+// Every entry here is a flag buildRunArgs already sets for a security reason.
+// ExtraArgs is appended last, and the runtime CLIs take the final occurrence of
+// a repeated flag, so an entry here does not add to the sandbox — it replaces
+// part of it. Flags with a legitimate non-hardening use (--dns, --label,
+// --add-host, --env, extra --tmpfs mounts, --volume for read-only reference
+// data) are deliberately absent: the goal is closing override paths, not
+// turning ExtraArgs into an allow-list.
 //
-// This refuses unconditionally rather than only on disagreement. "--runtime=runsc
+// The override behaviour of each was confirmed against a real Docker daemon
+// rather than assumed — see the notes below.
+var deniedExtraArgs = map[string]string{
+	// Verified: `--cap-drop ALL --cap-add CHOWN` lets chown succeed inside the
+	// container, so a later --cap-add re-grants what --cap-drop ALL removed.
+	"--cap-add": "re-grants capabilities that --cap-drop ALL removes",
+	// Not repeat-tested because it needs no repeat: --privileged turns off the
+	// whole confinement layer (capabilities, device access, seccomp/AppArmor) in
+	// one word, whatever else is on the command line.
+	"--privileged": "disables the entire confinement layer at once",
+	// Verified: `--user 65534:65534 --user 0:0` reports uid 0. The last --user
+	// wins, so this is a direct path from the unprivileged grading user to root
+	// inside the container.
+	"--user": "overrides the unprivileged --user the runner sets",
+	// Verified: repeating --network with "none" errors out rather than silently
+	// downgrading — but that breaks every grading run, and any value here
+	// contradicts the egress policy the grading spec declares.
+	"--network": "contradicts the spec-declared egress policy (and errors when repeated with none)",
+	// Verified: `--memory 512m --memory 1g` reports a 1 GiB cgroup limit.
+	"--memory": "raises the memory cap the grading spec set",
+	// Same last-wins path, and raising it alone re-enables swap escape, since
+	// the runner's protection is --memory-swap being equal to --memory.
+	"--memory-swap": "re-enables swap escape by unpinning --memory-swap from --memory",
+	// Verified: `--pids-limit 256 --pids-limit 4096` reports 4096.
+	"--pids-limit": "raises the process cap that bounds fork bombs",
+	// Verified: `--cpus 1 --cpus 2` reports a 2-CPU quota.
+	"--cpus": "raises the CPU quota the grading spec set",
+	// --security-opt accumulates rather than overrides (NoNewPrivs stayed set in
+	// testing), but an added value such as seccomp=unconfined or
+	// apparmor=unconfined still removes a layer the runner relies on.
+	"--security-opt": "can add seccomp=unconfined or apparmor=unconfined alongside no-new-privileges",
+	// Verified: `--read-only=false` is accepted by Docker, so the boolean's
+	// negated form makes the root filesystem writable again.
+	"--read-only": "makes the root filesystem writable again via --read-only=false",
+	// The OCI runtime is the isolation tier's decision; see IsolationTier.
+	"--runtime": "overrides the OCI runtime chosen by the isolation tier",
+}
+
+// validateExtraArgs refuses an ExtraArgs entry that would override a hardening
+// decision buildRunArgs already makes.
+//
+// This refuses unconditionally rather than comparing values. "--runtime=runsc
 // alongside Isolation=gvisor" happens to be harmless today, but permitting it
-// makes the runtime a two-source setting, and the next edit to either source
+// makes each setting a two-source value, and the next edit to either source
 // silently decides which one wins. One setting, one source.
 func (r *ContainerRunner) validateExtraArgs() error {
 	for _, a := range r.ExtraArgs {
-		if a == "--runtime" || strings.HasPrefix(a, "--runtime=") {
-			return fmt.Errorf(
-				"ExtraArgs may not contain %q: the OCI runtime is selected by the isolation tier "+
-					"(currently %q). Remove it from ExtraArgs and set the tier instead — valid tiers are %q and %q",
-				a, string(r.EffectiveIsolation()), string(IsolationShared), string(IsolationGVisor))
+		flag := a
+		if i := strings.IndexByte(a, '='); i >= 0 {
+			flag = a[:i] // --flag=value
 		}
+		reason, denied := deniedExtraArgs[flag]
+		if !denied {
+			continue
+		}
+		if flag == "--runtime" {
+			return fmt.Errorf(
+				"ExtraArgs may not contain %q: %s (currently %q). Remove it from ExtraArgs and set "+
+					"the tier instead — valid tiers are %q and %q",
+				a, reason, string(r.EffectiveIsolation()), string(IsolationShared), string(IsolationGVisor))
+		}
+		return fmt.Errorf(
+			"ExtraArgs may not contain %q: it %s. ExtraArgs is appended after the runner's own "+
+				"flags, so this would weaken the sandbox rather than add to it — set the limit in the "+
+				"grading spec if it needs to change",
+			a, reason)
 	}
 	return nil
 }

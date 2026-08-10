@@ -182,7 +182,13 @@ func gvisorFix(runtime string) string {
 }
 
 // runtimeFix turns the runtime's own error into the specific thing to change.
+// Podman's failure surface is genuinely different from Docker's — it is
+// daemonless and usually rootless, so Docker's socket-and-group advice is not
+// merely unhelpful there, it points at things that do not exist.
 func runtimeFix(runtime, output string, err error) string {
+	if runtime == "podman" {
+		return podmanRuntimeFix(output, err)
+	}
 	s := strings.ToLower(output + " " + err.Error())
 	switch {
 	case strings.Contains(s, "permission denied"):
@@ -198,6 +204,43 @@ func runtimeFix(runtime, output string, err error) string {
 			"(the Cairn image ships the docker CLI; a host install needs docker.io)"
 	default:
 		return "confirm " + runtime + " works for this user: `" + runtime + " version`"
+	}
+}
+
+// podmanRuntimeFix maps a podman failure to the thing to actually change.
+//
+// Verified against podman's own documentation, 2026-08-09: podman is daemonless
+// and normally rootless, so there is no daemon socket to join a group for and
+// no DOCKER_GID equivalent. Its real failure modes are a socket unit that was
+// never enabled (podman.socket is not enabled by default and uses systemd
+// socket activation), a DOCKER_HOST pointing somewhere the socket is not, and —
+// on macOS or Windows — a `podman machine` VM that was never initialised or
+// started, since containers need a Linux kernel.
+func podmanRuntimeFix(output string, err error) string {
+	s := strings.ToLower(output + " " + err.Error())
+	switch {
+	case strings.Contains(s, "executable file not found") || strings.Contains(s, "not found"):
+		return "install podman, or set CAIRN_GRADER_RUNTIME to a runtime that is installed\n" +
+			"(the Cairn image ships the docker CLI, not podman — a podman host needs it installed there)"
+	case strings.Contains(s, "machine") || strings.Contains(s, "vm "):
+		return "podman needs a Linux VM on macOS/Windows:\n" +
+			"  podman machine init      # once\n" +
+			"  podman machine start\n" +
+			"note that grading bind-mounts a host directory, which must also be shared into that VM"
+	case strings.Contains(s, "permission denied"):
+		return "rootless podman cannot reach its socket, or the work directory is not readable by this user.\n" +
+			"this is NOT a docker-group problem — rootless podman has no daemon to join a group for:\n" +
+			"  systemctl --user enable --now podman.socket\n" +
+			"  ls -ld \"$XDG_RUNTIME_DIR/podman/podman.sock\"\n" +
+			"if Cairn runs as a service user, that user needs a login session (loginctl enable-linger <user>)"
+	default:
+		// Covers "cannot connect", "connection refused", and anything else:
+		// for podman these almost always mean the socket is not listening.
+		return "podman is not reachable. It is daemonless, so the usual cause is the socket unit:\n" +
+			"  systemctl --user enable --now podman.socket\n" +
+			"  export DOCKER_HOST=unix://$XDG_RUNTIME_DIR/podman/podman.sock\n" +
+			"on macOS/Windows start the VM instead: podman machine init && podman machine start\n" +
+			"confirm with: podman version"
 	}
 }
 
@@ -222,25 +265,47 @@ func checkMountRoundTrip(ctx context.Context, cfg GradingConfig, runtime string,
 	}
 
 	// Mirrors internal/grading's mount: -v <hostdir>:/work.
+	//
+	// These flags are podman-compatible, verified against podman-run(1) rather
+	// than assumed: --rm, --network none, -v host:container bind mounts, and
+	// "image sh -c cmd" all exist with the same meaning. No podman-specific
+	// spelling is needed here, so this check is deliberately shared.
+	//
+	// The one real divergence is SELinux: a bind mount keeps its host label, so
+	// on an SELinux host a rootless container can be denied access to a
+	// perfectly present directory. That surfaces here as a failed round trip,
+	// which is why mountFix mentions relabelling for podman.
 	got, err := cmd.Run(ctx, runtime, "run", "--rm", "--network", "none",
 		"-v", dir+":/work", cfg.Image, "sh", "-c", "cat /work/probe.txt")
 	if err != nil || !strings.Contains(got, probeSentinel) {
-		return failf(name, mountFix(cfg.WorkDir),
+		return failf(name, mountFix(cfg.WorkDir, runtime),
 			"a directory Cairn created (%s) is not visible inside a grading container — "+
 				"every grading run would find an empty checkout", dir)
 	}
 	return okf(name, "%s is visible to %s at the same path", workDirLabel(cfg.WorkDir), runtime)
 }
 
-func mountFix(workDir string) string {
+func mountFix(workDir, runtime string) string {
+	var fix string
 	if workDir == "" {
-		return "set TMPDIR to a directory that is bind-mounted at the SAME path on host and container,\n" +
+		fix = "set TMPDIR to a directory that is bind-mounted at the SAME path on host and container,\n" +
 			"e.g. TMPDIR=/var/lib/cairn/work with -v /var/lib/cairn/work:/var/lib/cairn/work.\n" +
-			"the Docker daemon resolves -v paths on the HOST, so a container-only path is empty"
+			"the container runtime resolves -v paths on the HOST, so a container-only path is empty"
+	} else {
+		fix = "bind-mount " + workDir + " at the same path on both sides:\n" +
+			"  -v " + workDir + ":" + workDir + "\n" +
+			"the container runtime resolves -v paths on the HOST, so a container-only path is empty"
 	}
-	return "bind-mount " + workDir + " at the same path on both sides:\n" +
-		"  -v " + workDir + ":" + workDir + "\n" +
-		"the Docker daemon resolves -v paths on the HOST, so a container-only path is empty"
+	if runtime == "podman" {
+		// A bind mount keeps its host SELinux label, so a present, readable
+		// directory can still be denied inside the container. Docker users hit
+		// this far less often because the daemon runs privileged.
+		fix += "\n\non podman, also check SELinux and the user namespace:\n" +
+			"  ls -Z " + workDirLabel(workDir) + "        # a mismatched label denies access\n" +
+			"  relabel with :z (shared) or :Z (private) on the mount if so\n" +
+			"  rootless podman maps UIDs, so the directory must be owned by the user running Cairn"
+	}
+	return fix
 }
 
 func workDirLabel(dir string) string {

@@ -127,9 +127,12 @@ supported Brightspace), so the manual fallback ships first and independently.
   (never promotes to exact) — fixed in CC-CA10/CC-CA11. Known follow-ups,
   not yet fixed: initials are compared positionally, so a tie with
   reordered initials (`"Jane A. B. Doe"` vs `"Jane B. A. Doe"`) still falls
-  back to ambiguous instead of narrowing; and matching is ASCII/case-folding
-  only, so an accented name (e.g. "José") won't match at all — likelier to
-  matter on a real roster than the initials case.)*
+  back to ambiguous instead of narrowing. Matching was ASCII/case-folding
+  only, so an accented name (e.g. "José") wouldn't match at all — fixed in
+  CC-CA13/CC-CA14 (2026-08-10): `normalizeName` now folds diacritics via a
+  Unicode NFD-decompose/strip-marks/NFC-recompose pass
+  (`golang.org/x/text`), verified against both precomposed and decomposed
+  input forms and against the initial-narrowing tier.)*
 
 ## Hardening and CI — 2026-08-09
 - [x] **CC-CA1 — gVisor isolation tier for grading.** `CAIRN_GRADER_ISOLATION`
@@ -164,6 +167,13 @@ supported Brightspace), so the manual fallback ships first and independently.
   systematically closing gaps each prompt's own execution report named but
   didn't fix: the `ExtraArgs` escape hatch and podman detection (CC-CA1,
   above), and the same-name-collision resolution UI (CC-CA7, above).
+- [x] **CC-CA13/CC-CA14 — Unicode/accented-name matching (CC-CA7 follow-up).**
+  `normalizeName` now folds diacritics (NFD-decompose, strip `unicode.Mn`
+  combining marks, NFC-recompose) so an accented LMS name matches an
+  unaccented Git-host profile name at every tier, including the CC-CA11
+  initial-narrowing. Verified against both precomposed and decomposed
+  Unicode forms of the same visible name, since an LMS export and a Git
+  host have no reason to agree on which form they use.
 
 ## Phase 4 — Hosted + LMS integration *(stretch)*
 - [ ] Multi-tenant hosted offering (scoped data processor)

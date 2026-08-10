@@ -51,10 +51,26 @@ Then:
 3. Generate a **private key** and save the downloaded `.pem` somewhere readable by
    the Cairn process, e.g. `/etc/cairn/github-app.pem`.
 
+   **Running via `deploy/docker-compose.yml` (the documented deploy path,
+   `docs/deploy.md`)?** The host path above doesn't apply — the container runs
+   as a non-root user with no access to arbitrary host paths. Instead:
+   - Place the downloaded `.pem` at the **repository root** as `github-app.pem`
+     (a sibling of `.env`). The compose file bind-mounts it read-only into the
+     container automatically; no extra step needed.
+   - Set `CAIRN_GITHUB_PRIVATE_KEY_FILE` to the **container-side** path,
+     `/run/secrets/github-app.pem` — not the host path where you saved the file.
+     These are two different paths (host vs. container); the env var always
+     wants the container-side one under Compose.
+
 ```sh
+# Bare-metal / non-container Cairn:
 export CAIRN_GITHUB_APP_ID=123456
 export CAIRN_GITHUB_INSTALLATION_ID=987654
 export CAIRN_GITHUB_PRIVATE_KEY_FILE=/etc/cairn/github-app.pem
+
+# deploy/docker-compose.yml instead: same APP_ID/INSTALLATION_ID, but
+# export CAIRN_GITHUB_PRIVATE_KEY_FILE=/run/secrets/github-app.pem
+# with the .pem saved as github-app.pem at the repository root.
 ```
 
 > **GitHub Enterprise Server**: also set `CAIRN_GITHUB_BASE_URL=https://ghe.cs-dept.edu`

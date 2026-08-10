@@ -99,6 +99,13 @@ when you have them.
 > `POSTGRES_PASSWORD` and points it at its own PostgreSQL. Same for
 > `CAIRN_WEB_DIR` and `TMPDIR` — the deployment owns those three.
 
+> **After editing `.env` or any compose file, use `docker compose up -d
+> [service]`, not `docker compose restart`.** `restart` only restarts the
+> existing container process — it does not reread `.env` or recreate the
+> container, so your change silently has no effect even though the command
+> reports success. `up -d` recreates whatever changed. If a plain `up -d`
+> doesn't seem to take effect, add `--force-recreate`.
+
 ## 5. Start it
 
 ```sh

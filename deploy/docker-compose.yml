@@ -64,6 +64,19 @@ services:
       # inside this container would be mounted empty into the grading container
       # and every run would fail. `cairn doctor` verifies this round trip.
       - ${CAIRN_WORK_DIR:-/var/lib/cairn/work}:${CAIRN_WORK_DIR:-/var/lib/cairn/work}
+      # GitHub App private key: place the downloaded .pem at the repository
+      # root as github-app.pem (sibling to .env) and it lands here read-only.
+      # See docs/github-setup.md §2 step 3. CAIRN_GITHUB_PRIVATE_KEY_FILE must
+      # point at this CONTAINER-side path, /run/secrets/github-app.pem — not
+      # the host path.
+      #
+      # If you don't use the GitHub adapter (Forgejo/GitLab only), you won't
+      # have a github-app.pem file, and Docker will auto-create an empty
+      # github-app.pem/ directory at the repository root as the bind-mount
+      # source. That stray empty directory is expected and harmless, not a
+      # bug — this mount is left unconditional rather than gated behind a
+      # Compose profile for one line.
+      - ../github-app.pem:/run/secrets/github-app.pem:ro
     ports:
       # Bind to 127.0.0.1 when fronting this with the tls profile.
       - "${CAIRN_HTTP_BIND:-0.0.0.0}:${CAIRN_HTTP_PORT:-8080}:8080"

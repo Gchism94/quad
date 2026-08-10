@@ -121,28 +121,49 @@ supported Brightspace), so the manual fallback ships first and independently.
   *(`internal/rosteragent`, `cairn roster pull`; Brightspace CSV export
   primary, Valence API secondary — live-verified against a real course that
   the admin-gated API path is correctly gated, per §1 of
-  `docs/lms-roster-agent.md`. Known follow-up, not yet fixed: a same-name
-  collision in `MatchRoster` correctly falls to "needs confirmation" rather
-  than guessing, but has no dedicated resolution UI yet — worth a small
-  prompt if the pilot section turns out to have duplicate names.)*
+  `docs/lms-roster-agent.md`. A same-name collision in `MatchRoster` now has
+  a real resolution path — `Match.Resolve`, an interactive numbered prompt
+  in `cairn roster pull`, and a middle-initial tiebreak that narrows
+  (never promotes to exact) — fixed in CC-CA10/CC-CA11. Known follow-ups,
+  not yet fixed: initials are compared positionally, so a tie with
+  reordered initials (`"Jane A. B. Doe"` vs `"Jane B. A. Doe"`) still falls
+  back to ambiguous instead of narrowing; and matching is ASCII/case-folding
+  only, so an accented name (e.g. "José") won't match at all — likelier to
+  matter on a real roster than the initials case.)*
 
 ## Hardening and CI — 2026-08-09
 - [x] **CC-CA1 — gVisor isolation tier for grading.** `CAIRN_GRADER_ISOLATION`
   (`shared` default / `gvisor`), refused rather than silently downgraded when
   unavailable; `cairn doctor` checks the daemon's registered runtimes.
-  Known follow-ups, not yet fixed: `ExtraArgs` can still smuggle in a
-  `--runtime` override, bypassing validation; the doctor check's
-  runtime-list query assumes Docker's output shape and likely misreads a
-  podman deployment (fails closed either way, so not a safety gap, just an
-  incomplete one).
+  `ExtraArgs` smuggling a `--runtime` override, and the doctor check
+  misreading a podman deployment, are both fixed (CC-CA10/CC-CA11): the
+  runtime escape is now a full deny-list covering every hardening flag
+  `ExtraArgs`'s append-last position could otherwise override
+  (`--privileged`, `--cap-add`, `--user`, `--network`, `--memory`,
+  `--memory-swap`, `--pids-limit`, `--cpus`, `--security-opt`,
+  `--read-only`, `--runtime`), and podman gets its own gVisor-availability
+  message (honest "not verified" rather than a false "not registered") plus
+  its own `runtimeFix`/mount-round-trip advice instead of Docker's. Known
+  follow-ups, not yet fixed: the deny-list is a static map with no shared
+  source of truth against `buildRunArgs`, so a newly-added hardening flag
+  there won't automatically get denied; and `GradingConfig.Runtime` is
+  free-form, so a typo like `"Podman"` silently falls through to Docker's
+  advice instead of podman's.
 - [x] **CC-CA8 — frontend test runner.** Vitest stood up; backfilled the
   `roster-parse.ts` and `api.inviteUrl` tests that CC-CA3 and CC-CA6 could
   only verify by hand. No CI existed yet to run them automatically — see
   CC-CA9.
 - [x] **CC-CA9 — CI.** `.github/workflows/ci.yml`: Go (`build`, `vet`,
   `gofmt`, `test -race`) and frontend (`typecheck`, `test`, `build`) on
-  every push/PR. Not yet required on `main` branch protection — recommended
-  once it's gone green on a few real PRs.
+  every push/PR. Three consecutive green runs on real commits as of
+  2026-08-09 (CC-CA12); `main` branch protection deliberately not yet
+  enabled — the repo's current direct-to-main workflow (no PR process) means
+  requiring status checks would gate every push, not just merges, so this
+  waits on a workflow decision rather than a technical bar.
+- [x] **CC-CA10/CC-CA11 — close the flagged follow-ups.** Two rounds
+  systematically closing gaps each prompt's own execution report named but
+  didn't fix: the `ExtraArgs` escape hatch and podman detection (CC-CA1,
+  above), and the same-name-collision resolution UI (CC-CA7, above).
 
 ## Phase 4 — Hosted + LMS integration *(stretch)*
 - [ ] Multi-tenant hosted offering (scoped data processor)

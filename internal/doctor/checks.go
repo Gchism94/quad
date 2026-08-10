@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 )
 
@@ -299,6 +300,32 @@ func CheckAuth(adminUsers []string, authDisabled bool, resolvers []string, cooki
 			"served over HTTPS but the session cookie lacks the Secure flag"))
 	}
 	return out
+}
+
+// --- retention --------------------------------------------------------------
+
+// CheckRetention reports whether the grade purge-after-confirmed-export policy
+// is configured. raw is the literal CAIRN_GRADE_RETENTION_DAYS value ("" means
+// unset). Unset is a warning, not a failure — Cairn runs fine without it — but
+// it means grades accumulate indefinitely once exported, which is exactly the
+// open item this check exists to surface (PRIVACY.md's "Open items"). A set
+// but non-positive value is a failure: it looks configured but silently
+// disables purge, which is worse than leaving it unset.
+func CheckRetention(raw string) Result {
+	const name = "grade retention"
+	if raw == "" {
+		return warnf(name,
+			"set CAIRN_GRADE_RETENTION_DAYS to the number of days to keep a grade after its export is\n"+
+				"confirmed (POST .../grades/confirm-export) — 30 is a conservative starting point",
+			"unset — purge is effectively disabled; confirmed-exported grades accumulate indefinitely")
+	}
+	days, err := strconv.Atoi(raw)
+	if err != nil || days <= 0 {
+		return failf(name,
+			"CAIRN_GRADE_RETENTION_DAYS must be a positive integer",
+			"CAIRN_GRADE_RETENTION_DAYS=%q is not a positive integer — purge is disabled although the variable is set", raw)
+	}
+	return okf(name, "purging confirmed-exported grades after %d day(s)", days)
 }
 
 // --- dashboard ------------------------------------------------------------

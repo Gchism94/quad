@@ -114,6 +114,13 @@ type Grade struct {
 	Breakdown    []byte    `json:"breakdown,omitempty"` // JSON: per-test results
 	RunID        string    `json:"run_id,omitempty"`
 	GradedAt     time.Time `json:"graded_at"`
+	// ExportConfirmedAt is set by an explicit instructor action (POST
+	// .../grades/confirm-export), never by the CSV download itself, so a page
+	// reload or automated fetch of grades.csv cannot silently start the
+	// retention countdown. nil means the grade has not been confirmed exported
+	// and is never purged, regardless of age. See DESIGN.md section 10 and
+	// PRIVACY.md's "Open items".
+	ExportConfirmedAt *time.Time `json:"export_confirmed_at,omitempty"`
 }
 
 // JobStatus is the lifecycle state of a provisioning job.

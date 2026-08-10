@@ -316,6 +316,36 @@ func TestCheckWebDir(t *testing.T) {
 	requireFixes(t, []Result{got})
 }
 
+func TestCheckRetention(t *testing.T) {
+	t.Run("unset warns, purge effectively disabled", func(t *testing.T) {
+		got := CheckRetention("")
+		if got.Status != StatusWarn {
+			t.Errorf("got %v", got.Status)
+		}
+		requireFixes(t, []Result{got})
+	})
+
+	t.Run("configured is ok", func(t *testing.T) {
+		got := CheckRetention("30")
+		if got.Status != StatusOK {
+			t.Errorf("got %+v", got)
+		}
+		if !strings.Contains(got.Detail, "30") {
+			t.Errorf("detail should name the configured day count: %q", got.Detail)
+		}
+	})
+
+	t.Run("set but non-positive fails — looks configured but silently disables purge", func(t *testing.T) {
+		for _, raw := range []string{"0", "-5", "not-a-number"} {
+			got := CheckRetention(raw)
+			if got.Status != StatusFail {
+				t.Errorf("raw=%q: got %v, want fail", raw, got.Status)
+			}
+		}
+		requireFixes(t, []Result{CheckRetention("0")})
+	})
+}
+
 func TestReportWriteAndOK(t *testing.T) {
 	var r Report
 	r.Add(okf("store", "sqlite"))

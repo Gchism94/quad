@@ -21,6 +21,7 @@ func TestMigrationFilesAreOrderedAndComplete(t *testing.T) {
 		"0002_submission_last_error.up.sql",
 		"0003_classroom_join_policy.up.sql",
 		"0004_student_loop_indexes.up.sql",
+		"0005_grade_export_confirmed.up.sql",
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("migrationFiles() = %v, want %v", got, want)

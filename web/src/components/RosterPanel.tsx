@@ -41,6 +41,29 @@ export function RosterPanel({ classroomID, notify }: { classroomID: string; noti
     }
   }
 
+  async function remove(entry: RosterEntry) {
+    if (
+      !window.confirm(
+        `Permanently delete ${entry.host_username} from this classroom?\n\n` +
+          "This erases the roster entry and every dependent submission, grade, and grading run — " +
+          "it cannot be undone. This is not the same as dropping them from this term's roster; " +
+          "if you just want them off an active roster while keeping their grade history, don't use this.",
+      )
+    ) {
+      return;
+    }
+    setBusy(true);
+    try {
+      await api.deleteRosterEntry(classroomID, entry.id);
+      notify(`Deleted ${entry.host_username} and all dependent records`);
+      void load();
+    } catch (e) {
+      notify(e instanceof Error ? e.message : String(e), "err");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function addBulk() {
     const rows = parseRosterInput(bulkText);
     if (rows.length === 0) {
@@ -156,6 +179,7 @@ export function RosterPanel({ classroomID, notify }: { classroomID: string; noti
               <th>Username</th>
               <th>Status</th>
               <th>Claimed</th>
+              <th></th>
             </tr>
           </thead>
           <tbody>
@@ -166,6 +190,11 @@ export function RosterPanel({ classroomID, notify }: { classroomID: string; noti
                   <StatusChip status={r.status} />
                 </td>
                 <td className="mono muted">{r.claimed_at ? new Date(r.claimed_at).toLocaleString() : "—"}</td>
+                <td>
+                  <Button variant="ghost" small disabled={busy} onClick={() => void remove(r)}>
+                    Delete
+                  </Button>
+                </td>
               </tr>
             ))}
           </tbody>

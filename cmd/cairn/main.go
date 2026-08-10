@@ -207,6 +207,10 @@ func serve() {
 	scheduler := &provisioning.Scheduler{Store: st, Queue: queue, Interval: time.Minute}
 	go scheduler.Run(ctx)
 
+	retentionDays := gradeRetentionDaysFromEnv()
+	purge := &provisioning.PurgeJob{Store: st, RetentionDays: retentionDays, Interval: 24 * time.Hour}
+	go purge.Run(ctx)
+
 	webDir := os.Getenv("CAIRN_WEB_DIR")
 
 	admins := splitCSV(os.Getenv("CAIRN_ADMIN_USERS"))
@@ -357,6 +361,24 @@ func graderFromEnv(st store.Store) provisioning.Grader {
 		}
 		return nil
 	}
+}
+
+// gradeRetentionDaysFromEnv reads CAIRN_GRADE_RETENTION_DAYS. Unset means
+// retention is unconfigured (0, purge effectively disabled) rather than
+// silently defaulting to some number of days — the day count is a policy
+// choice for Greg/counsel, not one this code is authorized to make
+// permanently. A set-but-invalid value fails startup rather than silently
+// disabling purge.
+func gradeRetentionDaysFromEnv() int {
+	v := os.Getenv("CAIRN_GRADE_RETENTION_DAYS")
+	if v == "" {
+		return 0
+	}
+	n, err := strconv.Atoi(v)
+	if err != nil || n <= 0 {
+		log.Fatalf("CAIRN_GRADE_RETENTION_DAYS must be a positive integer, got %q", v)
+	}
+	return n
 }
 
 func getenvDefault(key, def string) string {

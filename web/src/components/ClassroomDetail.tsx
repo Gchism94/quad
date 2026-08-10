@@ -7,6 +7,28 @@ import { RosterPanel } from "./RosterPanel";
 export function ClassroomDetail({ classroom, notify }: { classroom: Classroom; notify: Notify }) {
   const [assignments, setAssignments] = useState<Assignment[] | null>(null);
   const [showForm, setShowForm] = useState(false);
+  const [confirmingExport, setConfirmingExport] = useState(false);
+
+  async function confirmExport() {
+    if (
+      !window.confirm(
+        "This starts the retention countdown for every currently graded submission in this classroom. " +
+          "It does not delete anything now, and does not re-download grades.csv — only download and confirm once you've " +
+          "actually gotten the grades into your LMS. Continue?",
+      )
+    ) {
+      return;
+    }
+    setConfirmingExport(true);
+    try {
+      const res = await api.confirmExport(classroom.id);
+      notify(`Export confirmed for ${res.confirmed} grade(s) — retention countdown started`);
+    } catch (e) {
+      notify(e instanceof Error ? e.message : String(e), "err");
+    } finally {
+      setConfirmingExport(false);
+    }
+  }
 
   async function load() {
     try {
@@ -36,9 +58,14 @@ export function ClassroomDetail({ classroom, notify }: { classroom: Classroom; n
             <span>id {classroom.id.slice(0, 8)}</span>
           </div>
         </div>
-        <a className="btn" href={api.gradesCsvUrl(classroom.id)} download>
-          ↓ grades.csv
-        </a>
+        <div className="form-row">
+          <a className="btn" href={api.gradesCsvUrl(classroom.id)} download>
+            ↓ grades.csv
+          </a>
+          <Button variant="ghost" small disabled={confirmingExport} onClick={() => void confirmExport()}>
+            {confirmingExport ? "Confirming…" : "Confirm export"}
+          </Button>
+        </div>
       </header>
 
       <div className="section">

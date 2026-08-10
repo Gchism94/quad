@@ -59,6 +59,7 @@ var knownEnvVars = []string{
 	"CAIRN_GIT_CLONE_TOKEN",
 	"CAIRN_LISTEN_ADDR", "CAIRN_WEB_DIR", "CAIRN_WEBHOOK_BASE_URL",
 	"CAIRN_GHC_TOKEN",
+	"CAIRN_GRADE_RETENTION_DAYS",
 }
 
 // deploymentEnvVars are consumed by deploy/docker-compose.yml rather than by the
@@ -171,6 +172,8 @@ func buildDoctorReport(ctx context.Context, verifyHosts bool) doctor.Report {
 		}
 		return nil
 	}))
+
+	rep.Add(doctor.CheckRetention(os.Getenv("CAIRN_GRADE_RETENTION_DAYS")))
 
 	rep.AddAll(doctor.CheckGrading(ctx, doctor.GradingConfig{
 		Mode:      os.Getenv("CAIRN_GRADER"),

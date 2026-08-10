@@ -228,6 +228,35 @@ func (m *Store) ListRosterEntries(_ context.Context, classroomID string) ([]*sto
 	return out, nil
 }
 
+// DeleteRosterEntry has no real FK engine to lean on, unlike Postgres/SQLite,
+// so it walks and removes every dependent submission, grade, and grading run
+// by hand before removing the roster entry itself.
+func (m *Store) DeleteRosterEntry(_ context.Context, id string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if _, ok := m.roster[id]; !ok {
+		return store.ErrNotFound
+	}
+	for subID, sub := range m.submissions {
+		if sub.RosterEntryID != id {
+			continue
+		}
+		for gID, g := range m.grades {
+			if g.SubmissionID == subID {
+				delete(m.grades, gID)
+			}
+		}
+		for rID, run := range m.gradingRuns {
+			if run.SubmissionID == subID {
+				delete(m.gradingRuns, rID)
+			}
+		}
+		delete(m.submissions, subID)
+	}
+	delete(m.roster, id)
+	return nil
+}
+
 // --- submissions ---
 
 func (m *Store) CreateSubmission(_ context.Context, s *store.Submission) error {
@@ -405,6 +434,79 @@ func (m *Store) ListGradesBySubmission(_ context.Context, submissionID string) (
 		return out[i].GradedAt.After(out[j].GradedAt)
 	})
 	return out, nil
+}
+
+// ConfirmExport marks export_confirmed_at on every not-yet-confirmed grade
+// belonging to classroomID. Deliberately a separate action from grades.csv
+// itself — see store.Grade.ExportConfirmedAt's doc comment.
+func (m *Store) ConfirmExport(_ context.Context, classroomID string, now time.Time) (int, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	inClassroom := map[string]bool{}
+	for _, a := range m.assignments {
+		if a.ClassroomID == classroomID {
+			inClassroom[a.ID] = true
+		}
+	}
+	subInClassroom := map[string]bool{}
+	for _, sub := range m.submissions {
+		if inClassroom[sub.AssignmentID] {
+			subInClassroom[sub.ID] = true
+		}
+	}
+
+	confirmed := 0
+	for id, g := range m.grades {
+		if !subInClassroom[g.SubmissionID] || g.ExportConfirmedAt != nil {
+			continue
+		}
+		t := now
+		g.ExportConfirmedAt = &t
+		m.grades[id] = g
+		confirmed++
+	}
+	return confirmed, nil
+}
+
+// PurgeExportedGrades deletes every grade whose export was confirmed at or
+// before cutoff, and — for each run_id it frees — the matching grading_runs
+// row, but only when no surviving grade still references that run.
+func (m *Store) PurgeExportedGrades(_ context.Context, cutoff time.Time) (int, int, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	var runIDs []string
+	gradesPurged := 0
+	for id, g := range m.grades {
+		if g.ExportConfirmedAt == nil || !g.ExportConfirmedAt.Before(cutoff) {
+			continue
+		}
+		delete(m.grades, id)
+		gradesPurged++
+		if g.RunID != "" {
+			runIDs = append(runIDs, g.RunID)
+		}
+	}
+
+	runsPurged := 0
+	for _, runID := range runIDs {
+		stillReferenced := false
+		for _, g := range m.grades {
+			if g.RunID == runID {
+				stillReferenced = true
+				break
+			}
+		}
+		if stillReferenced {
+			continue
+		}
+		if _, ok := m.gradingRuns[runID]; ok {
+			delete(m.gradingRuns, runID)
+			runsPurged++
+		}
+	}
+	return gradesPurged, runsPurged, nil
 }
 
 // --- grading runs ---

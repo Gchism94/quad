@@ -58,6 +58,12 @@ type Store interface {
 	FindRosterEntryByUsername(ctx context.Context, classroomID, username string) (*RosterEntry, error)
 	UpdateRosterEntry(ctx context.Context, r *RosterEntry) error
 	ListRosterEntries(ctx context.Context, classroomID string) ([]*RosterEntry, error)
+	// DeleteRosterEntry permanently deletes a roster entry and every dependent
+	// submission, grade, and grading run — a genuine, irreversible erasure, not
+	// the RosterRemoved lifecycle status. Returns ErrNotFound if the entry is
+	// already gone (the caller decides whether that's an error or a no-op; the
+	// HTTP handler treats it as idempotent-safe).
+	DeleteRosterEntry(ctx context.Context, id string) error
 
 	// Submissions.
 	CreateSubmission(ctx context.Context, s *Submission) error
@@ -81,6 +87,17 @@ type Store interface {
 	// ListGradesBySubmission returns the full attempt history for a submission
 	// (most recent first), so a student can see how their score evolved.
 	ListGradesBySubmission(ctx context.Context, submissionID string) ([]*Grade, error)
+	// ConfirmExport marks export_confirmed_at = now on every grade belonging to
+	// classroomID that doesn't already have it set, starting that grade's
+	// retention clock. Idempotent: already-confirmed grades and grades created
+	// after this call are untouched. Returns how many grades were newly marked.
+	ConfirmExport(ctx context.Context, classroomID string, now time.Time) (confirmed int, err error)
+	// PurgeExportedGrades permanently deletes every grade whose export was
+	// confirmed strictly before cutoff, along with its grading_runs row when
+	// nothing else still references that run. Grades with no export
+	// confirmation are never touched regardless of age. Returns counts for
+	// observability.
+	PurgeExportedGrades(ctx context.Context, cutoff time.Time) (gradesPurged, runsPurged int, err error)
 
 	// Grading runs (audit trail of each grading execution).
 	CreateGradingRun(ctx context.Context, run *GradingRun) error

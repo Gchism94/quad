@@ -408,6 +408,14 @@ func (s *Store) ListRosterEntries(ctx context.Context, classroomID string) ([]*s
 	return out, rows.Err()
 }
 
+// DeleteRosterEntry relies on the schema's ON DELETE CASCADE
+// (roster_entries -> submissions -> grades/grading_runs) to remove every
+// dependent row; see migrations/0001_init.up.sql.
+func (s *Store) DeleteRosterEntry(ctx context.Context, id string) error {
+	res, err := s.db.ExecContext(ctx, `DELETE FROM roster_entries WHERE id=$1`, id)
+	return affected(res, err)
+}
+
 // ========================= submissions =========================
 
 const submissionCols = "id, assignment_id, roster_entry_id, repo_host, repo_namespace, repo_name, latest_commit, last_activity_at, status, last_error"
@@ -514,18 +522,23 @@ func (s *Store) querySubmissions(ctx context.Context, q string, args ...any) ([]
 
 // ========================= grades =========================
 
-const gradeCols = "id, submission_id, score, max_score, breakdown, run_id, graded_at"
+const gradeCols = "id, submission_id, score, max_score, breakdown, run_id, graded_at, export_confirmed_at"
 
 func (s *Store) CreateGrade(ctx context.Context, g *store.Grade) error {
 	g.GradedAt = now(g.GradedAt)
 	_, err := s.db.ExecContext(ctx,
-		`INSERT INTO grades (`+gradeCols+`) VALUES ($1,$2,$3,$4,$5,$6,$7)`,
-		g.ID, g.SubmissionID, g.Score, g.MaxScore, jsonb(g.Breakdown), g.RunID, g.GradedAt)
+		`INSERT INTO grades (`+gradeCols+`) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+		g.ID, g.SubmissionID, g.Score, g.MaxScore, jsonb(g.Breakdown), g.RunID, g.GradedAt, nt(g.ExportConfirmedAt))
 	return err
 }
 
 func scanGrade(r rowScanner, g *store.Grade) error {
-	return r.Scan(&g.ID, &g.SubmissionID, &g.Score, &g.MaxScore, &g.Breakdown, &g.RunID, &g.GradedAt)
+	var exportConfirmed sql.NullTime
+	if err := r.Scan(&g.ID, &g.SubmissionID, &g.Score, &g.MaxScore, &g.Breakdown, &g.RunID, &g.GradedAt, &exportConfirmed); err != nil {
+		return err
+	}
+	g.ExportConfirmedAt = tp(exportConfirmed)
+	return nil
 }
 
 func (s *Store) LatestGradeForSubmission(ctx context.Context, submissionID string) (*store.Grade, error) {
@@ -554,6 +567,78 @@ func (s *Store) ListGradesBySubmission(ctx context.Context, submissionID string)
 		out = append(out, g)
 	}
 	return out, rows.Err()
+}
+
+// ConfirmExport marks export_confirmed_at on every not-yet-confirmed grade
+// belonging to classroomID. Deliberately a separate action from grades.csv
+// itself — see Grade.ExportConfirmedAt's doc comment.
+func (s *Store) ConfirmExport(ctx context.Context, classroomID string, now time.Time) (int, error) {
+	res, err := s.db.ExecContext(ctx,
+		`UPDATE grades g
+		 SET export_confirmed_at = $2
+		 FROM submissions sub
+		 JOIN assignments a ON a.id = sub.assignment_id
+		 WHERE g.submission_id = sub.id
+		   AND a.classroom_id = $1
+		   AND g.export_confirmed_at IS NULL`,
+		classroomID, now)
+	if err != nil {
+		return 0, err
+	}
+	n, err := res.RowsAffected()
+	return int(n), err
+}
+
+// PurgeExportedGrades deletes every grade whose export was confirmed strictly
+// before cutoff, and — for each run_id it frees — the matching grading_runs
+// row, but only when no surviving grade still references that run.
+// grades.run_id is a loose TEXT column, not a foreign key (see
+// migrations/0001_init.up.sql), so that check is done explicitly rather than
+// relying on a cascade.
+func (s *Store) PurgeExportedGrades(ctx context.Context, cutoff time.Time) (int, int, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`DELETE FROM grades WHERE export_confirmed_at IS NOT NULL AND export_confirmed_at < $1 RETURNING run_id`,
+		cutoff)
+	if err != nil {
+		return 0, 0, err
+	}
+	var runIDs []string
+	gradesPurged := 0
+	for rows.Next() {
+		var runID sql.NullString
+		if err := rows.Scan(&runID); err != nil {
+			rows.Close()
+			return gradesPurged, 0, err
+		}
+		gradesPurged++
+		if runID.Valid && runID.String != "" {
+			runIDs = append(runIDs, runID.String)
+		}
+	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return gradesPurged, 0, err
+	}
+	rows.Close()
+
+	runsPurged := 0
+	for _, runID := range runIDs {
+		var stillReferenced int
+		if err := s.db.QueryRowContext(ctx, `SELECT count(*) FROM grades WHERE run_id=$1`, runID).Scan(&stillReferenced); err != nil {
+			return gradesPurged, runsPurged, err
+		}
+		if stillReferenced > 0 {
+			continue
+		}
+		res, err := s.db.ExecContext(ctx, `DELETE FROM grading_runs WHERE id=$1`, runID)
+		if err != nil {
+			return gradesPurged, runsPurged, err
+		}
+		if n, _ := res.RowsAffected(); n > 0 {
+			runsPurged++
+		}
+	}
+	return gradesPurged, runsPurged, nil
 }
 
 // ========================= grading runs =========================

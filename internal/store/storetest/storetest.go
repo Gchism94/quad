@@ -26,6 +26,7 @@ func Run(t *testing.T, open func(t *testing.T) store.Store) {
 	t.Run("Classrooms", func(t *testing.T) { testClassrooms(t, open(t)) })
 	t.Run("Assignments", func(t *testing.T) { testAssignments(t, open(t)) })
 	t.Run("Roster", func(t *testing.T) { testRoster(t, open(t)) })
+	t.Run("DeleteRosterEntry", func(t *testing.T) { testDeleteRosterEntry(t, open(t)) })
 	t.Run("Submissions", func(t *testing.T) { testSubmissions(t, open(t)) })
 	t.Run("SubmissionErrConflict", func(t *testing.T) { testSubmissionConflict(t, open(t)) })
 	t.Run("FindSubmissionByRepo", func(t *testing.T) { testFindSubmissionByRepo(t, open(t)) })
@@ -33,6 +34,8 @@ func Run(t *testing.T, open func(t *testing.T) store.Store) {
 	t.Run("Grades", func(t *testing.T) { testGrades(t, open(t)) })
 	t.Run("GradesBySubmission", func(t *testing.T) { testGradesBySubmission(t, open(t)) })
 	t.Run("GradingRuns", func(t *testing.T) { testGradingRuns(t, open(t)) })
+	t.Run("ConfirmExport", func(t *testing.T) { testConfirmExport(t, open(t)) })
+	t.Run("PurgeExportedGrades", func(t *testing.T) { testPurgeExportedGrades(t, open(t)) })
 	t.Run("JobIdempotency", func(t *testing.T) { testJobIdempotency(t, open(t)) })
 	t.Run("JobClaimOrdering", func(t *testing.T) { testJobClaimOrdering(t, open(t)) })
 }
@@ -251,6 +254,50 @@ func testRoster(t *testing.T, st store.Store) {
 	}
 	if len(list) != 2 {
 		t.Errorf("count = %d, want 2", len(list))
+	}
+}
+
+// testDeleteRosterEntry confirms the cascade actually happens end to end,
+// through the Store interface, rather than assuming a DB-level ON DELETE
+// CASCADE (Postgres/SQLite) or the memory store's manual walk are enough —
+// this is the regression guard CC-CA15 asked for.
+func testDeleteRosterEntry(t *testing.T, st store.Store) {
+	t.Helper()
+	ctx := context.Background()
+
+	_ = st.CreateClassroom(ctx, &store.Classroom{ID: "c1", Name: "CS101", Host: adapter.HostGitHub, HostNamespace: "org"})
+	_ = st.CreateAssignment(ctx, &store.Assignment{ID: "a1", ClassroomID: "c1", Title: "HW1", Slug: "hw-1", TemplateRef: adapter.TemplateRef{Host: adapter.HostGitHub, Namespace: "org", Name: "tpl"}, Type: store.AssignmentIndividual, GradingSpec: "grading.json"})
+	_ = st.CreateRosterEntry(ctx, &store.RosterEntry{ID: "r1", ClassroomID: "c1", Host: adapter.HostGitHub, HostUsername: "octocat", Status: store.RosterActive})
+	_ = st.CreateSubmission(ctx, &store.Submission{ID: "s1", AssignmentID: "a1", RosterEntryID: "r1", Status: "active"})
+	if err := st.CreateGrade(ctx, &store.Grade{ID: "g1", SubmissionID: "s1", Score: 90, MaxScore: 100, GradedAt: time.Now().UTC()}); err != nil {
+		t.Fatalf("CreateGrade: %v", err)
+	}
+	if err := st.CreateGradingRun(ctx, &store.GradingRun{ID: "gr1", SubmissionID: "s1", Status: "succeeded"}); err != nil {
+		t.Fatalf("CreateGradingRun: %v", err)
+	}
+
+	if err := st.DeleteRosterEntry(ctx, "r1"); err != nil {
+		t.Fatalf("DeleteRosterEntry: %v", err)
+	}
+
+	if _, err := st.GetRosterEntry(ctx, "r1"); !errors.Is(err, store.ErrNotFound) {
+		t.Fatalf("GetRosterEntry after delete: got %v, want ErrNotFound", err)
+	}
+	if _, err := st.GetSubmission(ctx, "s1"); !errors.Is(err, store.ErrNotFound) {
+		t.Fatalf("GetSubmission after delete: got %v, want ErrNotFound (cascade)", err)
+	}
+	if _, err := st.LatestGradeForSubmission(ctx, "s1"); !errors.Is(err, store.ErrNotFound) {
+		t.Fatalf("LatestGradeForSubmission after delete: got %v, want ErrNotFound (cascade)", err)
+	}
+	if runs, err := st.ListGradingRunsBySubmission(ctx, "s1"); err != nil || len(runs) != 0 {
+		t.Fatalf("ListGradingRunsBySubmission after delete: runs=%v err=%v, want empty (cascade)", runs, err)
+	}
+
+	// Deleting an already-gone entry is ErrNotFound, not a silent no-op — the
+	// HTTP handler maps this to a 404, which is what makes the endpoint
+	// idempotent-safe to call twice.
+	if err := st.DeleteRosterEntry(ctx, "r1"); !errors.Is(err, store.ErrNotFound) {
+		t.Fatalf("DeleteRosterEntry again: got %v, want ErrNotFound", err)
 	}
 }
 
@@ -530,6 +577,136 @@ func testGradingRuns(t *testing.T, st store.Store) {
 	}
 	if list[0].Status != "succeeded" {
 		t.Errorf("Status = %q, want succeeded", list[0].Status)
+	}
+}
+
+func testConfirmExport(t *testing.T, st store.Store) {
+	t.Helper()
+	ctx := context.Background()
+
+	_ = st.CreateClassroom(ctx, &store.Classroom{ID: "c1", Name: "CS101", Host: adapter.HostGitHub, HostNamespace: "org"})
+	_ = st.CreateAssignment(ctx, &store.Assignment{ID: "a1", ClassroomID: "c1", Title: "HW1", Slug: "hw-1", TemplateRef: adapter.TemplateRef{Host: adapter.HostGitHub, Namespace: "org", Name: "tpl"}, Type: store.AssignmentIndividual, GradingSpec: "grading.json"})
+	_ = st.CreateRosterEntry(ctx, &store.RosterEntry{ID: "r1", ClassroomID: "c1", Host: adapter.HostGitHub, HostUsername: "octocat", Status: store.RosterActive})
+	_ = st.CreateSubmission(ctx, &store.Submission{ID: "s1", AssignmentID: "a1", RosterEntryID: "r1", Status: "active"})
+	if err := st.CreateGrade(ctx, &store.Grade{ID: "g1", SubmissionID: "s1", Score: 80, MaxScore: 100, GradedAt: time.Now().UTC().Add(-time.Hour)}); err != nil {
+		t.Fatalf("CreateGrade g1: %v", err)
+	}
+
+	now := time.Now().UTC().Truncate(time.Second)
+	confirmed, err := st.ConfirmExport(ctx, "c1", now)
+	if err != nil {
+		t.Fatalf("ConfirmExport: %v", err)
+	}
+	if confirmed != 1 {
+		t.Fatalf("confirmed = %d, want 1", confirmed)
+	}
+
+	g, err := st.LatestGradeForSubmission(ctx, "s1")
+	if err != nil {
+		t.Fatalf("LatestGradeForSubmission: %v", err)
+	}
+	if g.ExportConfirmedAt == nil || !g.ExportConfirmedAt.Equal(now) {
+		t.Errorf("ExportConfirmedAt = %v, want %v", g.ExportConfirmedAt, now)
+	}
+
+	// Idempotent: re-calling confirms nothing new — g1 is already confirmed.
+	confirmed2, err := st.ConfirmExport(ctx, "c1", now.Add(time.Hour))
+	if err != nil {
+		t.Fatalf("ConfirmExport again: %v", err)
+	}
+	if confirmed2 != 0 {
+		t.Errorf("second confirmed = %d, want 0 (already confirmed)", confirmed2)
+	}
+
+	// A grade created after the confirm call is untouched.
+	if err := st.CreateGrade(ctx, &store.Grade{ID: "g2", SubmissionID: "s1", Score: 95, MaxScore: 100, GradedAt: now.Add(2 * time.Hour)}); err != nil {
+		t.Fatalf("CreateGrade g2: %v", err)
+	}
+	g2, err := st.LatestGradeForSubmission(ctx, "s1")
+	if err != nil {
+		t.Fatalf("LatestGradeForSubmission g2: %v", err)
+	}
+	if g2.ID != "g2" {
+		t.Fatalf("latest = %s, want g2", g2.ID)
+	}
+	if g2.ExportConfirmedAt != nil {
+		t.Errorf("g2.ExportConfirmedAt = %v, want nil (created after confirm)", g2.ExportConfirmedAt)
+	}
+}
+
+func testPurgeExportedGrades(t *testing.T, st store.Store) {
+	t.Helper()
+	ctx := context.Background()
+
+	_ = st.CreateClassroom(ctx, &store.Classroom{ID: "c1", Name: "CS101", Host: adapter.HostGitHub, HostNamespace: "org"})
+	_ = st.CreateAssignment(ctx, &store.Assignment{ID: "a1", ClassroomID: "c1", Title: "HW1", Slug: "hw-1", TemplateRef: adapter.TemplateRef{Host: adapter.HostGitHub, Namespace: "org", Name: "tpl"}, Type: store.AssignmentIndividual, GradingSpec: "grading.json"})
+	_ = st.CreateRosterEntry(ctx, &store.RosterEntry{ID: "r1", ClassroomID: "c1", Host: adapter.HostGitHub, HostUsername: "octocat", Status: store.RosterActive})
+	_ = st.CreateSubmission(ctx, &store.Submission{ID: "s1", AssignmentID: "a1", RosterEntryID: "r1", Status: "active"})
+
+	now := time.Now().UTC().Truncate(time.Second)
+	old := now.Add(-100 * 24 * time.Hour) // confirmed long ago — past any cutoff below
+	recent := now.Add(-time.Hour)         // confirmed recently — inside the retention window
+
+	// g1: confirmed long ago, past the cutoff — must purge, along with its run.
+	if err := st.CreateGradingRun(ctx, &store.GradingRun{ID: "gr1", SubmissionID: "s1", Status: "succeeded"}); err != nil {
+		t.Fatalf("CreateGradingRun gr1: %v", err)
+	}
+	if err := st.CreateGrade(ctx, &store.Grade{ID: "g1", SubmissionID: "s1", Score: 80, MaxScore: 100, GradedAt: old, RunID: "gr1", ExportConfirmedAt: &old}); err != nil {
+		t.Fatalf("CreateGrade g1: %v", err)
+	}
+
+	// g2: confirmed recently — must survive.
+	if err := st.CreateGradingRun(ctx, &store.GradingRun{ID: "gr2", SubmissionID: "s1", Status: "succeeded"}); err != nil {
+		t.Fatalf("CreateGradingRun gr2: %v", err)
+	}
+	if err := st.CreateGrade(ctx, &store.Grade{ID: "g2", SubmissionID: "s1", Score: 85, MaxScore: 100, GradedAt: now, RunID: "gr2", ExportConfirmedAt: &recent}); err != nil {
+		t.Fatalf("CreateGrade g2: %v", err)
+	}
+
+	// g3: never confirmed, despite being old — must survive regardless of age.
+	if err := st.CreateGradingRun(ctx, &store.GradingRun{ID: "gr3", SubmissionID: "s1", Status: "succeeded"}); err != nil {
+		t.Fatalf("CreateGradingRun gr3: %v", err)
+	}
+	if err := st.CreateGrade(ctx, &store.Grade{ID: "g3", SubmissionID: "s1", Score: 10, MaxScore: 100, GradedAt: old, RunID: "gr3"}); err != nil {
+		t.Fatalf("CreateGrade g3: %v", err)
+	}
+
+	cutoff := now.Add(-30 * 24 * time.Hour) // e.g. a 30-day retention window
+	gradesPurged, runsPurged, err := st.PurgeExportedGrades(ctx, cutoff)
+	if err != nil {
+		t.Fatalf("PurgeExportedGrades: %v", err)
+	}
+	if gradesPurged != 1 {
+		t.Errorf("gradesPurged = %d, want 1 (only g1)", gradesPurged)
+	}
+	if runsPurged != 1 {
+		t.Errorf("runsPurged = %d, want 1 (only gr1)", runsPurged)
+	}
+
+	hist, err := st.ListGradesBySubmission(ctx, "s1")
+	if err != nil {
+		t.Fatalf("ListGradesBySubmission after purge: %v", err)
+	}
+	if len(hist) != 2 {
+		t.Fatalf("history len after purge = %d, want 2 (g1 purged; g2, g3 survive)", len(hist))
+	}
+	for _, g := range hist {
+		if g.ID == "g1" {
+			t.Errorf("g1 should have been purged")
+		}
+	}
+
+	runs, err := st.ListGradingRunsBySubmission(ctx, "s1")
+	if err != nil {
+		t.Fatalf("ListGradingRunsBySubmission after purge: %v", err)
+	}
+	if len(runs) != 2 {
+		t.Fatalf("runs after purge = %d, want 2 (gr1 purged; gr2, gr3 survive)", len(runs))
+	}
+	for _, r := range runs {
+		if r.ID == "gr1" {
+			t.Errorf("gr1 should have been purged alongside g1")
+		}
 	}
 }
 

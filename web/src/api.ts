@@ -147,6 +147,17 @@ export const api = {
     req<RosterEntry>("POST", `/classrooms/${classroomID}/roster`, b),
   addRosterBulk: (classroomID: string, entries: BulkRosterEntry[]) =>
     req<BulkRosterResponse>("POST", `/classrooms/${classroomID}/roster/bulk`, { entries }),
+  // Irreversible: deletes the roster row and every dependent submission,
+  // grade, and grading run. Not the same thing as dropping a student from the
+  // active roster — see RosterPanel's confirm copy.
+  deleteRosterEntry: (classroomID: string, entryID: string) =>
+    req<void>("DELETE", `/classrooms/${classroomID}/roster/${entryID}`),
+
+  // Starts the retention countdown for this classroom's grades — deliberately
+  // separate from gradesCsvUrl's download so a page reload can't silently
+  // start it.
+  confirmExport: (classroomID: string) =>
+    req<{ confirmed: number }>("POST", `/classrooms/${classroomID}/grades/confirm-export`),
 
   listSubmissions: (assignmentID: string) =>
     req<SubmissionView[]>("GET", `/assignments/${assignmentID}/submissions`),

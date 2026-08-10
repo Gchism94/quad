@@ -24,6 +24,7 @@ import (
 	_ "github.com/jackc/pgx/v5/stdlib"
 
 	"github.com/EduCloud-Ecosystem/cairn/internal/store"
+	"github.com/EduCloud-Ecosystem/cairn/internal/store/storetest"
 	"github.com/EduCloud-Ecosystem/cairn/pkg/adapter"
 )
 
@@ -49,6 +50,14 @@ func testStore(t *testing.T) *Store {
 		t.Fatalf("truncate: %v", err)
 	}
 	return s
+}
+
+// TestStoreConformance runs the shared conformance suite (internal/store/storetest)
+// against a real PostgreSQL database — the same suite memory and sqlite run, so a
+// new Store method (e.g. CC-CA15's DeleteRosterEntry, ConfirmExport,
+// PurgeExportedGrades) is exercised against all three backends, not just two.
+func TestStoreConformance(t *testing.T) {
+	storetest.Run(t, func(t *testing.T) store.Store { return testStore(t) })
 }
 
 // TestMigrateAppliesAllMigrations is the live-database half of the CC-P5

@@ -170,9 +170,11 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /classrooms/{id}/roster", protect(s.handleListRoster))
 	s.mux.HandleFunc("POST /classrooms/{id}/roster", protect(s.handleAddRoster))
 	s.mux.HandleFunc("POST /classrooms/{id}/roster/bulk", protect(s.handleAddRosterBulk))
+	s.mux.HandleFunc("DELETE /classrooms/{id}/roster/{entry_id}", protect(s.handleDeleteRosterEntry))
 	s.mux.HandleFunc("GET /classrooms/{id}/assignments", protect(s.handleListAssignments))
 	s.mux.HandleFunc("POST /classrooms/{id}/assignments", protect(s.handleCreateAssignment))
 	s.mux.HandleFunc("GET /classrooms/{id}/grades.csv", protect(s.handleGradesCSV))
+	s.mux.HandleFunc("POST /classrooms/{id}/grades/confirm-export", protect(s.handleConfirmExport))
 	s.mux.HandleFunc("GET /assignments/{id}/submissions", protect(s.handleListSubmissions))
 	s.mux.HandleFunc("PATCH /assignments/{id}/deadline", protect(s.handleSetDeadline))
 	s.mux.HandleFunc("POST /assignments/{id}/lock", protect(s.handleLock))
@@ -619,6 +621,34 @@ func (s *Server) handleAddRoster(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusCreated, re)
+}
+
+// handleDeleteRosterEntry is a genuine, irreversible erasure: the roster row
+// and every dependent submission/grade/grading-run vanish. It is NOT the same
+// thing as the RosterRemoved lifecycle status (dropped from an active roster
+// while keeping grade history for the term) — this endpoint is for an actual
+// removal/erasure request. 404 if the entry is already gone, so calling it
+// twice is safe.
+func (s *Server) handleDeleteRosterEntry(w http.ResponseWriter, r *http.Request) {
+	cls, ok := s.requireClassroom(w, r)
+	if !ok {
+		return
+	}
+	entryID := r.PathValue("entry_id")
+	re, err := s.store.GetRosterEntry(r.Context(), entryID)
+	if err != nil {
+		s.notFoundOr500(w, err, "roster entry")
+		return
+	}
+	if re.ClassroomID != cls.ID {
+		httpError(w, http.StatusNotFound, "roster entry not found")
+		return
+	}
+	if err := s.store.DeleteRosterEntry(r.Context(), entryID); err != nil {
+		s.notFoundOr500(w, err, "roster entry")
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // maxBulkRosterRows bounds a single bulk request. It is generous for a real
@@ -1121,6 +1151,26 @@ func (s *Server) handleGradesCSV(w http.ResponseWriter, r *http.Request) {
 		_ = cw.Write([]string{username, slugByID[sub.AssignmentID], score, max})
 	}
 	cw.Flush()
+}
+
+// handleConfirmExport starts the retention countdown for this classroom's
+// grades. Deliberately a separate, explicit instructor action from
+// GET .../grades.csv — the CSV download itself must not auto-start a
+// retention clock, since a page reload or an automated fetch shouldn't be
+// able to silently begin counting down toward deletion of data the
+// instructor hasn't actually gotten into the LMS yet. Idempotent: re-calls
+// are a no-op for grades already confirmed.
+func (s *Server) handleConfirmExport(w http.ResponseWriter, r *http.Request) {
+	cls, ok := s.requireClassroom(w, r)
+	if !ok {
+		return
+	}
+	n, err := s.store.ConfirmExport(r.Context(), cls.ID, time.Now())
+	if err != nil {
+		httpError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]int{"confirmed": n})
 }
 
 // --- helpers ---

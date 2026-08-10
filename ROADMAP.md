@@ -176,6 +176,16 @@ supported Brightspace), so the manual fallback ships first and independently.
   host have no reason to agree on which form they use.
 
 ## Phase 4 — Hosted + LMS integration *(stretch)*
+- [ ] **Multiple GitHub App installations (multi-org support).** The App
+  registration itself (App ID + private key) is one-time and reusable across
+  orgs, but each org needs its own installation, and `cmd/cairn/main.go`
+  currently reads exactly one `CAIRN_GITHUB_INSTALLATION_ID` env var — Cairn
+  as built can only run against one installation at a time. Fine for the
+  single-org pilot; becomes a real gap the moment one Cairn instance needs to
+  serve more than one org/department. Needs a per-org installation-ID lookup
+  (keyed by org or classroom) instead of a single env var — a likely
+  prerequisite for the multi-tenant item below, not just adjacent to it.
+  Surfaced 2026-08-10 while wiring up the pilot droplet's GitHub App.
 - [ ] Multi-tenant hosted offering (scoped data processor)
 - [ ] LTI 1.3 Names-and-Roles (NRPS) roster sync
 - [ ] LTI Assignment-and-Grade Services (AGS) grade passback

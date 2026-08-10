@@ -197,6 +197,89 @@ func TestMatchTiers(t *testing.T) {
 	}
 }
 
+// normalizeName folds diacritics out so an accented LMS name matches an
+// unaccented Git-host profile name (CC-CA14), and vice versa.
+func TestAccentedNameMatchesUnaccentedCandidate(t *testing.T) {
+	candidates := []Candidate{
+		{Username: "jgarcia", FullName: "Jose Garcia"},
+	}
+	got := MatchRoster([]RosterRow{{Name: "José García"}}, candidates)[0]
+	if got.Status != MatchExact {
+		t.Fatalf("status = %q, want %q; why: %s", got.Status, MatchExact, got.Why)
+	}
+	if got.Username != "jgarcia" {
+		t.Errorf("username = %q, want jgarcia", got.Username)
+	}
+}
+
+// The subtler real bug: the same visible name can arrive precomposed (a
+// single "é" codepoint, U+00E9) or decomposed ("e" + a combining acute
+// accent, U+0065 U+0301) depending on which system produced it. These
+// render identically to a human but are different byte sequences, so both
+// forms must normalize to the same result and match each other.
+func TestPrecomposedAndDecomposedFormsMatch(t *testing.T) {
+	precomposed := "Jos\u00e9 Garc\u00eda"  // \u00e9=e-acute, \u00ee=i-acute: single codepoints
+	decomposed := "Jose\u0301 Garci\u0301a" // e/i + U+0301 combining acute accent
+
+	candidates := []Candidate{
+		{Username: "jgarcia", FullName: decomposed},
+	}
+	got := MatchRoster([]RosterRow{{Name: precomposed}}, candidates)[0]
+	if got.Status != MatchExact {
+		t.Fatalf("status = %q, want %q; why: %s", got.Status, MatchExact, got.Why)
+	}
+	if got.Username != "jgarcia" {
+		t.Errorf("username = %q, want jgarcia", got.Username)
+	}
+}
+
+// Umlauts fold the same way as accents — same mechanism, different mark.
+func TestUmlautNameMatchesUnaccentedCandidate(t *testing.T) {
+	candidates := []Candidate{
+		{Username: "umueller", FullName: "Uber Mueller"},
+	}
+	got := MatchRoster([]RosterRow{{Name: "Über Mueller"}}, candidates)[0]
+	if got.Status != MatchExact {
+		t.Fatalf("status = %q, want %q; why: %s", got.Status, MatchExact, got.Why)
+	}
+	if got.Username != "umueller" {
+		t.Errorf("username = %q, want umueller", got.Username)
+	}
+}
+
+// Folding must feed the CC-CA11 initial-narrowing tier, not bypass it: a
+// same-name collision that's only visible after folding still narrows by
+// initial rather than being auto-resolved.
+func TestAccentFoldingStillNarrowsByInitialRatherThanAutoResolving(t *testing.T) {
+	candidates := []Candidate{
+		{Username: "jaruiz", FullName: "Jose A. Ruiz"},
+		{Username: "jbruiz", FullName: "Jose B. Ruiz"},
+	}
+	got := MatchRoster([]RosterRow{{Name: "José A Ruiz"}}, candidates)[0]
+	if got.Status != MatchNeedsConfirm {
+		t.Fatalf("status = %q, want %q (narrowed, not resolved outright); why: %s",
+			got.Status, MatchNeedsConfirm, got.Why)
+	}
+	if got.Username != "jaruiz" {
+		t.Errorf("username = %q, want jaruiz — the initial should pick A over B", got.Username)
+	}
+}
+
+// Regression guard: an already-unaccented ASCII name is unaffected by the
+// folding change.
+func TestASCIINameUnaffectedByAccentFolding(t *testing.T) {
+	candidates := []Candidate{
+		{Username: "jdoe", FullName: "Jane Doe"},
+	}
+	got := MatchRoster([]RosterRow{{Name: "Jane Doe", Email: "x@example.edu"}}, candidates)[0]
+	if got.Status != MatchExact {
+		t.Fatalf("status = %q, want %q; why: %s", got.Status, MatchExact, got.Why)
+	}
+	if got.Username != "jdoe" {
+		t.Errorf("username = %q, want jdoe", got.Username)
+	}
+}
+
 // Two students with the same name must not be auto-assigned to whichever
 // candidate sorted first — and the tie has to be *resolvable*, not just
 // detected, so the tied candidates come back with the match.

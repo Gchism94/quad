@@ -23,6 +23,11 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"unicode"
+
+	"golang.org/x/text/runes"
+	"golang.org/x/text/transform"
+	"golang.org/x/text/unicode/norm"
 )
 
 // RosterRow is one student as the LMS reports them, before any matching. Every
@@ -295,8 +300,16 @@ func nameParts(s string) []string {
 	return out
 }
 
+var stripDiacritics = transform.Chain(norm.NFD, runes.Remove(runes.In(unicode.Mn)), norm.NFC)
+
 func normalizeName(s string) string {
-	return strings.ToLower(strings.Join(strings.Fields(strings.TrimSpace(s)), " "))
+	folded := strings.ToLower(strings.Join(strings.Fields(strings.TrimSpace(s)), " "))
+	if out, _, err := transform.String(stripDiacritics, folded); err == nil {
+		return out
+	}
+	// Malformed input: a roster row that fails to fold is worse than one
+	// that's merely unfolded, so fall back rather than failing the match.
+	return folded
 }
 
 // squash removes separators so "jane.doe", "jane-doe" and "janedoe" compare equal.
